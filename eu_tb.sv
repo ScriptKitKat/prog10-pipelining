@@ -412,7 +412,7 @@ module eu_tb;
         @(posedge clk); #1;
 
         // ============================================================
-        // TEST 14: FPU FADD — result at stage 4 (4 cycles)
+        // TEST 14: FPU FADD — 2-stage pipe: result after 2 cycles from issue
         // ============================================================
         $display("\n--- Test 14: FPU FADD ---");
         // 2.0 + 3.0 = 5.0 in IEEE-754
@@ -422,15 +422,9 @@ module eu_tb;
         fpu_dest_tag = 7'd60; fpu_rob_idx = 5'd16;
         @(posedge clk); #1; fpu_clear;
 
-        // Stages 1-3: not yet at output
         check1("fadd s1 not out", fpu_valid_out, 1'b0);
         @(posedge clk); #1;
-        check1("fadd s2 not out", fpu_valid_out, 1'b0);
-        @(posedge clk); #1;
-        check1("fadd s3 not out", fpu_valid_out, 1'b0);
-        @(posedge clk); #1;
-        // Stage 4: result available
-        check1("fadd s4 valid", fpu_valid_out, 1'b1);
+        check1("fadd s2 valid", fpu_valid_out, 1'b1);
         check("fadd result", fpu_result_out, 64'h4014000000000000); // 5.0
         check("fadd dest_tag", {57'b0, fpu_dest_tag_out}, {57'b0, 7'd60});
 
@@ -447,15 +441,13 @@ module eu_tb;
         fpu_dest_tag = 7'd61; fpu_rob_idx = 5'd17;
         @(posedge clk); #1; fpu_clear;
         @(posedge clk); #1;
-        @(posedge clk); #1;
-        @(posedge clk); #1;
         check1("fmul valid", fpu_valid_out, 1'b1);
         check("fmul result", fpu_result_out, 64'h4018000000000000); // 6.0
 
         @(posedge clk); #1;
 
         // ============================================================
-        // TEST 16: FPU flush clears all 4 stages
+        // TEST 16: FPU flush clears both stages
         // ============================================================
         $display("\n--- Test 16: FPU flush ---");
         fpu_valid_in = 1; fpu_opcode = 5'h14;
@@ -474,10 +466,6 @@ module eu_tb;
         check1("fpu flush out", fpu_valid_out, 1'b0);
         @(posedge clk); #1;
         check1("fpu flush +1", fpu_valid_out, 1'b0);
-        @(posedge clk); #1;
-        check1("fpu flush +2", fpu_valid_out, 1'b0);
-        @(posedge clk); #1;
-        check1("fpu flush +3", fpu_valid_out, 1'b0);
 
         @(posedge clk); #1;
 
@@ -497,10 +485,8 @@ module eu_tb;
         fpu_dest_tag = 7'd81; fpu_rob_idx = 5'd21;
         @(posedge clk); #1;
         fpu_clear;
-        // Wait for A (3 more cycles)
         @(posedge clk); #1;
-        @(posedge clk); #1;
-        // A should appear
+        // A should appear (2-stage latency from its issue)
         check1("fpu thrpt A valid", fpu_valid_out, 1'b1);
         check("fpu thrpt A result", fpu_result_out, 64'h4000000000000000); // 2.0
         check("fpu thrpt A tag", {57'b0, fpu_dest_tag_out}, {57'b0, 7'd80});
