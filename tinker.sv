@@ -429,6 +429,7 @@ module tinker (
     // ALU Pipelines x2
     // ================================================================
     wire        alu0_valid_out, alu1_valid_out;
+    wire [4:0]  alu0_opc_out, alu1_opc_out;
     wire [6:0]  alu0_dt_out, alu1_dt_out;
     wire [4:0]  alu0_ri_out, alu1_ri_out;
     wire [63:0] alu0_result, alu1_result;
@@ -437,6 +438,12 @@ module tinker (
     wire [63:0] alu0_br_target, alu1_br_target;
     wire        alu0_mispred, alu1_mispred;
     wire        alu0_ready, alu1_ready;
+
+    // LOAD/STORE address computations should NOT broadcast on CDB
+    wire alu0_is_mem = alu0_valid_out && ((alu0_opc_out == 5'h10) || (alu0_opc_out == 5'h13));
+    wire alu1_is_mem = alu1_valid_out && ((alu1_opc_out == 5'h10) || (alu1_opc_out == 5'h13));
+    wire alu0_cdb_valid = alu0_valid_out && !alu0_is_mem;
+    wire alu1_cdb_valid = alu1_valid_out && !alu1_is_mem;
 
     wire        stall_alu0_cdb, stall_alu1_cdb;
 
@@ -448,7 +455,8 @@ module tinker (
         .dest_tag_in(alu_rs_idt0), .rob_idx_in(alu_rs_iri0),
         .imm_in(alu_rs_iimm0), .pc_in(alu_rs_ipc0), .br_pred_taken_in(alu_rs_ibp0),
         .pipe_ready(alu0_ready),
-        .valid_out(alu0_valid_out), .dest_tag_out(alu0_dt_out), .rob_idx_out(alu0_ri_out),
+        .valid_out(alu0_valid_out), .opcode_out(alu0_opc_out),
+        .dest_tag_out(alu0_dt_out), .rob_idx_out(alu0_ri_out),
         .result_out(alu0_result), .is_branch_out(alu0_is_br),
         .branch_taken_out(alu0_br_taken), .branch_target_out(alu0_br_target),
         .mispredict_out(alu0_mispred)
@@ -462,7 +470,8 @@ module tinker (
         .dest_tag_in(alu_rs_idt1), .rob_idx_in(alu_rs_iri1),
         .imm_in(alu_rs_iimm1), .pc_in(alu_rs_ipc1), .br_pred_taken_in(alu_rs_ibp1),
         .pipe_ready(alu1_ready),
-        .valid_out(alu1_valid_out), .dest_tag_out(alu1_dt_out), .rob_idx_out(alu1_ri_out),
+        .valid_out(alu1_valid_out), .opcode_out(alu1_opc_out),
+        .dest_tag_out(alu1_dt_out), .rob_idx_out(alu1_ri_out),
         .result_out(alu1_result), .is_branch_out(alu1_is_br),
         .branch_taken_out(alu1_br_taken), .branch_target_out(alu1_br_target),
         .mispredict_out(alu1_mispred)
@@ -540,13 +549,15 @@ module tinker (
         .st_dispatch_en1(dr_lsq_st_en_b), .st_dispatch_rob_idx1(dr_lsq_st_ri_b),
         .st_dispatch_data1(dr_lsq_st_data_b), .st_dispatch_data_ready1(dr_lsq_st_drdy_b), .st_dispatch_data_tag1(dr_lsq_st_dtag_b),
         .st_full(lsq_st_full_w), .st_almost_full(lsq_st_almost_full_w),
-        // Address arrival from ALU pipes (via CDB broadcast or direct)
-        .ld_addr_valid(alu0_valid_out && !alu0_is_br),
-        .ld_addr_rob_idx(alu0_ri_out),
-        .ld_addr_value(alu0_result),
-        .st_addr_valid(alu1_valid_out && !alu1_is_br),
-        .st_addr_rob_idx(alu1_ri_out),
-        .st_addr_value(alu1_result),
+        // Address arrival from ALU pipes — either ALU can compute either type.
+        // LSQ matches by rob_idx, so we mux with ALU0 priority on ld_addr
+        // and ALU1 priority on st_addr (covers single + dual address cycles).
+        .ld_addr_valid(alu0_is_mem || alu1_is_mem),
+        .ld_addr_rob_idx(alu0_is_mem ? alu0_ri_out : alu1_ri_out),
+        .ld_addr_value(alu0_is_mem ? alu0_result : alu1_result),
+        .st_addr_valid(alu1_is_mem || alu0_is_mem),
+        .st_addr_rob_idx(alu1_is_mem ? alu1_ri_out : alu0_ri_out),
+        .st_addr_value(alu1_is_mem ? alu1_result : alu0_result),
         .st_addr_data(64'd0), .st_addr_data_valid(1'b0),
         // CDB snoop for store data capture
         .cdb_valid0(cdb_valid_bus0), .cdb_tag0(cdb_tag_bus0), .cdb_value0(cdb_value_bus0),
@@ -555,9 +566,11 @@ module tinker (
         .mem_read_addr(lsq_mem_read_addr), .mem_read_en(lsq_mem_read_en),
         .mem_read_data(mem_data_out),
         .mem_write_en(lsq_mem_write_en), .mem_write_addr(lsq_mem_write_addr), .mem_write_data(lsq_mem_write_data),
-        // Store commit
-        .store_commit_en(rob_commit_en0 && rob_commit_type0 == 3'd3),
-        .store_commit_rob_idx(rob_commit_arch_rd0),  // reuse — actually need rob index
+        // Store commit (either ROB slot can commit a store)
+        .store_commit_en((rob_commit_en0 && rob_commit_type0 == 3'd3) ||
+                         (rob_commit_en1 && rob_commit_type1 == 3'd3)),
+        .store_commit_rob_idx((rob_commit_en0 && rob_commit_type0 == 3'd3) ?
+                              rob_head_idx : (rob_head_idx + 5'd1)),
         // Outputs
         .load_result_valid(lsq_load_result_valid), .load_result_dest_tag(lsq_load_result_dt),
         .load_result_rob_idx(lsq_load_result_ri), .load_result_data(lsq_load_result_data),
@@ -576,9 +589,9 @@ module tinker (
 
     cdb u_cdb (
         .clk(clk), .reset(reset),
-        .src_alu0_valid(alu0_valid_out), .src_alu0_tag(alu0_dt_out),
+        .src_alu0_valid(alu0_cdb_valid), .src_alu0_tag(alu0_dt_out),
         .src_alu0_value(alu0_result), .src_alu0_rob_idx(alu0_ri_out),
-        .src_alu1_valid(alu1_valid_out), .src_alu1_tag(alu1_dt_out),
+        .src_alu1_valid(alu1_cdb_valid), .src_alu1_tag(alu1_dt_out),
         .src_alu1_value(alu1_result), .src_alu1_rob_idx(alu1_ri_out),
         .src_fpu0_valid(fpu0_valid_out), .src_fpu0_tag(fpu0_dt_out),
         .src_fpu0_value(fpu0_result), .src_fpu0_rob_idx(fpu0_ri_out),
@@ -620,6 +633,7 @@ module tinker (
             case (cdb_win0_id)
                 3'd0: begin rob_cdb_br_actual0 = alu0_br_taken; rob_cdb_mispredict0 = alu0_mispred; rob_cdb_store_addr0 = alu0_br_target; end
                 3'd1: begin rob_cdb_br_actual0 = alu1_br_taken; rob_cdb_mispredict0 = alu1_mispred; rob_cdb_store_addr0 = alu1_br_target; end
+                3'd5: begin rob_cdb_store_addr0 = lsq_store_complete_addr; end
                 default: ;
             endcase
         end
@@ -631,6 +645,7 @@ module tinker (
             case (cdb_win1_id)
                 3'd0: begin rob_cdb_br_actual1 = alu0_br_taken; rob_cdb_mispredict1 = alu0_mispred; rob_cdb_store_addr1 = alu0_br_target; end
                 3'd1: begin rob_cdb_br_actual1 = alu1_br_taken; rob_cdb_mispredict1 = alu1_mispred; rob_cdb_store_addr1 = alu1_br_target; end
+                3'd5: begin rob_cdb_store_addr1 = lsq_store_complete_addr; end
                 default: ;
             endcase
         end
@@ -662,8 +677,19 @@ module tinker (
     // ================================================================
     // Fetch unit flush + BHT update
     // ================================================================
+    // Bypass redirect PC directly from CDB (available same cycle as flush)
+    // rather than waiting for ROB's registered output.
+    reg [63:0] mispredict_redirect_pc;
+    always @(*) begin
+        mispredict_redirect_pc = 64'd0;
+        if (cdb_valid_bus0 && rob_cdb_mispredict0)
+            mispredict_redirect_pc = cdb_value_bus0;
+        else if (cdb_valid_bus1 && rob_cdb_mispredict1)
+            mispredict_redirect_pc = cdb_value_bus1;
+    end
+
     assign fetch_flush    = do_flush;
-    assign fetch_flush_pc = rob_flush_redirect_pc;
+    assign fetch_flush_pc = mispredict_redirect_pc;
 
     // BHT update on branch completion via CDB
     assign bht_update_en   = (cdb_valid_bus0 && (cdb_win0_id == 3'd0 || cdb_win0_id == 3'd1) && cdb_win0_valid &&
@@ -710,16 +736,9 @@ module tinker (
     assign fl_free_reg1 = flush_active ? rob_flush_free_reg1 :
                           rob_commit_old_phys1;
 
-    // Memory store commit
-    wire commit0_is_store = rob_commit_en0 && (rob_commit_type0 == 3'd3);
-    wire commit1_is_store = rob_commit_en1 && (rob_commit_type1 == 3'd3);
-
-    assign mem_write_en   = commit0_is_store || commit1_is_store || lsq_mem_write_en;
-    assign mem_write_addr = lsq_mem_write_en ? lsq_mem_write_addr :
-                            commit0_is_store ? rob_commit_store_addr0 :
-                            rob_commit_store_addr1;
-    assign mem_write_data = lsq_mem_write_en ? lsq_mem_write_data :
-                            commit0_is_store ? rob_commit_store_data0 :
-                            rob_commit_store_data1;
+    // Memory store commit — only the LSQ writes to memory (after ROB signals commit)
+    assign mem_write_en   = lsq_mem_write_en;
+    assign mem_write_addr = lsq_mem_write_addr;
+    assign mem_write_data = lsq_mem_write_data;
 
 endmodule

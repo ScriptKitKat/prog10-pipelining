@@ -427,6 +427,16 @@ module decode_rename (
     end
 
     // ================================================================
+    // Intra-group dependency: if B's source tag == A's newly allocated
+    // physical register, the PRF ready bit is stale (still 1 from reset
+    // or a prior write). Override to 0 so the RS waits for CDB snoop.
+    // ================================================================
+    wire intra_dep_s1b = issue_a && hdest_a && (rat_phys2 == new_phys_a);
+    wire intra_dep_s2b = issue_a && hdest_a && (rat_phys3 == new_phys_a);
+    wire b_s1_rdy = prf_ready2 && !intra_dep_s1b;
+    wire b_s2_rdy = prf_ready3 && !intra_dep_s2b;
+
+    // ================================================================
     // Drive all outputs (combinational)
     // ================================================================
     always @(*) begin
@@ -618,10 +628,10 @@ module decode_rename (
                     rs_alu_dispatch_opcode_b  = opc_b;
                     rs_alu_dispatch_src1_val_b = prf_data2;
                     rs_alu_dispatch_src1_tag_b = rat_phys2;
-                    rs_alu_dispatch_src1_rdy_b = prf_ready2;
+                    rs_alu_dispatch_src1_rdy_b = b_s1_rdy;
                     rs_alu_dispatch_src2_val_b = ns2_b ? prf_data3 : 64'd0;
                     rs_alu_dispatch_src2_tag_b = ns2_b ? rat_phys3 : 7'd0;
-                    rs_alu_dispatch_src2_rdy_b = ns2_b ? prf_ready3 : 1'b1;
+                    rs_alu_dispatch_src2_rdy_b = ns2_b ? b_s2_rdy : 1'b1;
                     rs_alu_dispatch_dest_tag_b = hdest_b ? new_phys_b : 7'd0;
                     rs_alu_dispatch_rob_idx_b  = rob_alloc_idx1;
                     rs_alu_dispatch_imm_b      = imm_b;
@@ -633,10 +643,10 @@ module decode_rename (
                     rs_fpu_dispatch_opcode_b  = opc_b;
                     rs_fpu_dispatch_src1_val_b = prf_data2;
                     rs_fpu_dispatch_src1_tag_b = rat_phys2;
-                    rs_fpu_dispatch_src1_rdy_b = prf_ready2;
+                    rs_fpu_dispatch_src1_rdy_b = b_s1_rdy;
                     rs_fpu_dispatch_src2_val_b = prf_data3;
                     rs_fpu_dispatch_src2_tag_b = rat_phys3;
-                    rs_fpu_dispatch_src2_rdy_b = prf_ready3;
+                    rs_fpu_dispatch_src2_rdy_b = b_s2_rdy;
                     rs_fpu_dispatch_dest_tag_b = new_phys_b;
                     rs_fpu_dispatch_rob_idx_b  = rob_alloc_idx1;
                     rs_fpu_dispatch_imm_b      = imm_b;
@@ -650,7 +660,7 @@ module decode_rename (
                     rs_alu_dispatch_opcode_b   = opc_b;
                     rs_alu_dispatch_src1_val_b = prf_data2;
                     rs_alu_dispatch_src1_tag_b = rat_phys2;
-                    rs_alu_dispatch_src1_rdy_b = prf_ready2;
+                    rs_alu_dispatch_src1_rdy_b = b_s1_rdy;
                     rs_alu_dispatch_src2_rdy_b = 1'b1;
                     rs_alu_dispatch_dest_tag_b = new_phys_b;
                     rs_alu_dispatch_rob_idx_b  = rob_alloc_idx1;
@@ -661,13 +671,13 @@ module decode_rename (
                     lsq_st_dispatch_en_b       = 1'b1;
                     lsq_st_dispatch_rob_idx_b  = rob_alloc_idx1;
                     lsq_st_dispatch_data_b     = prf_data3;
-                    lsq_st_dispatch_data_rdy_b = prf_ready3;
+                    lsq_st_dispatch_data_rdy_b = b_s2_rdy;
                     lsq_st_dispatch_data_tag_b = rat_phys3;
                     rs_alu_dispatch_en_b       = 1'b1;
                     rs_alu_dispatch_opcode_b   = opc_b;
                     rs_alu_dispatch_src1_val_b = prf_data2;
                     rs_alu_dispatch_src1_tag_b = rat_phys2;
-                    rs_alu_dispatch_src1_rdy_b = prf_ready2;
+                    rs_alu_dispatch_src1_rdy_b = b_s1_rdy;
                     rs_alu_dispatch_src2_rdy_b = 1'b1;
                     rs_alu_dispatch_dest_tag_b = 7'd0;
                     rs_alu_dispatch_rob_idx_b  = rob_alloc_idx1;

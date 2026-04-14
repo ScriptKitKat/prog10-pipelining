@@ -32,6 +32,7 @@ module alu_pipe (
 
     // --- Stage-2 outputs (to CDB) ---
     output        valid_out,
+    output [4:0]  opcode_out,
     output [6:0]  dest_tag_out,
     output [4:0]  rob_idx_out,
     output [63:0] result_out,
@@ -131,14 +132,23 @@ module alu_pipe (
             5'h11: s1_result_c = s1_src1;                      // MOV rd, rs
             5'h12: s1_result_c = {s1_src1[63:12], s1_imm[11:0]}; // MOVI (read-modify-write)
 
+            // --- LOAD / STORE address computation ---
+            5'h10: s1_result_c = s1_src1 + s1_imm;            // LOAD addr = base + offset
+            5'h13: s1_result_c = s1_src1 + s1_imm;            // STORE addr = base + offset
+
             default: s1_result_c = 64'b0;
         endcase
+
+        // For branches, the result carries the correct next PC for flush redirect
+        if (s1_is_branch_c)
+            s1_result_c = s1_branch_taken_c ? s1_branch_target_c : (s1_pc + 64'd4);
     end
 
     // ----------------------------------------------------------------
     // Stage-2 pipeline registers (result latch → CDB)
     // ----------------------------------------------------------------
     reg        s2_valid;
+    reg [4:0]  s2_opcode;
     reg [6:0]  s2_dest_tag;
     reg [4:0]  s2_rob_idx;
     reg [63:0] s2_result;
@@ -167,6 +177,7 @@ module alu_pipe (
         end else if (advance) begin
             // Stage 2 ← stage-1 combinational result
             s2_valid         <= s1_valid;
+            s2_opcode        <= s1_opcode;
             s2_dest_tag      <= s1_dest_tag;
             s2_rob_idx       <= s1_rob_idx;
             s2_result        <= s1_result_c;
@@ -205,6 +216,7 @@ module alu_pipe (
     // Outputs (from stage 2)
     // ----------------------------------------------------------------
     assign valid_out         = s2_valid;
+    assign opcode_out        = s2_opcode;
     assign dest_tag_out      = s2_dest_tag;
     assign rob_idx_out       = s2_rob_idx;
     assign result_out        = s2_result;

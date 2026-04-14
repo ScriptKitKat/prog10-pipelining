@@ -437,19 +437,29 @@ module load_store_queue (
                     sq_data_tag[sq_free_slot1]   <= st_dispatch_data_tag1;
                 end
 
-                // --- Load address arrival ---
+                // --- Address arrival (both ports search BOTH queues by rob_idx) ---
                 if (ld_addr_valid) begin
-                    for (i = 0; i < Q_SIZE; i = i + 1)
+                    for (i = 0; i < Q_SIZE; i = i + 1) begin
                         if (lq_valid[i] && !lq_addr_ready[i] &&
                             lq_rob_idx[i] == ld_addr_rob_idx) begin
                             lq_addr[i]      <= ld_addr_value;
                             lq_addr_ready[i] <= 1'b1;
                         end
+                        if (sq_valid[i] && !sq_addr_ready[i] &&
+                            sq_rob_idx[i] == ld_addr_rob_idx) begin
+                            sq_addr[i]      <= ld_addr_value;
+                            sq_addr_ready[i] <= 1'b1;
+                        end
+                    end
                 end
 
-                // --- Store address (+ optional data) arrival ---
                 if (st_addr_valid) begin
-                    for (i = 0; i < Q_SIZE; i = i + 1)
+                    for (i = 0; i < Q_SIZE; i = i + 1) begin
+                        if (lq_valid[i] && !lq_addr_ready[i] &&
+                            lq_rob_idx[i] == st_addr_rob_idx) begin
+                            lq_addr[i]      <= st_addr_value;
+                            lq_addr_ready[i] <= 1'b1;
+                        end
                         if (sq_valid[i] && !sq_addr_ready[i] &&
                             sq_rob_idx[i] == st_addr_rob_idx) begin
                             sq_addr[i]      <= st_addr_value;
@@ -459,6 +469,7 @@ module load_store_queue (
                                 sq_data_ready[i] <= 1'b1;
                             end
                         end
+                    end
                 end
 
             end // normal operation

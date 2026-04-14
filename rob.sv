@@ -277,7 +277,7 @@ module rob (
                     old_phys[tail_idx]  <= alloc_old_phys0;
                     new_phys[tail_idx]  <= alloc_new_phys0;
                     has_dest[tail_idx]  <= alloc_has_dest0;
-                    completed[tail_idx] <= 0;
+                    completed[tail_idx] <= (alloc_type0 == TYPE_HALT);
                     br_pred[tail_idx]   <= alloc_br_pred0;
                     mispred[tail_idx]   <= 0;
                     pc[tail_idx]        <= alloc_pc0;
@@ -288,7 +288,7 @@ module rob (
                     old_phys[tail_idx + 5'd1]  <= alloc_old_phys1;
                     new_phys[tail_idx + 5'd1]  <= alloc_new_phys1;
                     has_dest[tail_idx + 5'd1]  <= alloc_has_dest1;
-                    completed[tail_idx + 5'd1] <= 0;
+                    completed[tail_idx + 5'd1] <= (alloc_type1 == TYPE_HALT);
                     br_pred[tail_idx + 5'd1]   <= alloc_br_pred1;
                     mispred[tail_idx + 5'd1]   <= 0;
                     pc[tail_idx + 5'd1]        <= alloc_pc1;
@@ -302,7 +302,7 @@ module rob (
                     old_phys[tail_idx]  <= alloc_old_phys0;
                     new_phys[tail_idx]  <= alloc_new_phys0;
                     has_dest[tail_idx]  <= alloc_has_dest0;
-                    completed[tail_idx] <= 0;
+                    completed[tail_idx] <= (alloc_type0 == TYPE_HALT);
                     br_pred[tail_idx]   <= alloc_br_pred0;
                     mispred[tail_idx]   <= 0;
                     pc[tail_idx]        <= alloc_pc0;
