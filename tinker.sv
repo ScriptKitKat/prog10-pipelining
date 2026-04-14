@@ -491,7 +491,7 @@ module tinker (
 
     wire        stall_fpu0_cdb, stall_fpu1_cdb;
 
-    fpu_pipe u_fpu0 (
+    fpu_pipe fpu (
         .clk(clk), .reset(reset), .flush(do_flush),
         .stall(stall_fpu0_cdb),
         .valid_in(fpu_rs_iv0 && fpu_rs_grant0),
