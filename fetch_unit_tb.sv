@@ -18,6 +18,7 @@ module fetch_unit_tb;
     wire [31:0] out0_inst, out1_inst;
     wire [63:0] out0_pc, out1_pc;
     wire        out0_br_pred, out1_br_pred;
+    wire [63:0] out0_pred_target, out1_pred_target;
     wire        out0_valid, out1_valid;
 
     reg        flush;
@@ -27,6 +28,10 @@ module fetch_unit_tb;
     reg [63:0] bht_update_pc;
     reg        bht_pred_taken;
     reg        bht_actual_taken;
+
+    reg        btb_update_en;
+    reg [63:0] btb_update_pc, btb_update_target;
+    reg        btb_update_taken;
 
     function automatic [511:0] line_bytes(
         input [31:0] w0, w1, w2, w3,
@@ -62,11 +67,15 @@ module fetch_unit_tb;
         .instr_fetch_addr(instr_fetch_addr),
         .instr_fetch_data(instr_fetch_data),
         .decode_take(decode_take),
-        .out0_inst(out0_inst), .out0_pc(out0_pc), .out0_br_pred(out0_br_pred), .out0_valid(out0_valid),
-        .out1_inst(out1_inst), .out1_pc(out1_pc), .out1_br_pred(out1_br_pred), .out1_valid(out1_valid),
+        .out0_inst(out0_inst), .out0_pc(out0_pc), .out0_br_pred(out0_br_pred),
+        .out0_pred_target(out0_pred_target), .out0_valid(out0_valid),
+        .out1_inst(out1_inst), .out1_pc(out1_pc), .out1_br_pred(out1_br_pred),
+        .out1_pred_target(out1_pred_target), .out1_valid(out1_valid),
         .flush(flush), .flush_pc(flush_pc),
         .bht_update_en(bht_update_en), .bht_update_pc(bht_update_pc),
-        .bht_pred_taken(bht_pred_taken), .bht_actual_taken(bht_actual_taken)
+        .bht_pred_taken(bht_pred_taken), .bht_actual_taken(bht_actual_taken),
+        .btb_update_en(btb_update_en), .btb_update_pc(btb_update_pc),
+        .btb_update_target(btb_update_target), .btb_update_taken(btb_update_taken)
     );
 
     initial clk = 0;
@@ -115,6 +124,10 @@ module fetch_unit_tb;
         bht_update_pc = 0;
         bht_pred_taken = 0;
         bht_actual_taken = 0;
+        btb_update_en = 0;
+        btb_update_pc = 0;
+        btb_update_target = 0;
+        btb_update_taken = 0;
 
         reset = 1;
         @(posedge clk); #1;

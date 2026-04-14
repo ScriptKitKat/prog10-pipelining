@@ -1,4 +1,5 @@
-// Fetch unit: PC, 16-entry instruction FIFO, 64-byte line fetch, 1-bit BHT (256 entries).
+// Fetch unit: PC, 16-entry instruction FIFO, 64-byte line fetch,
+// 1-bit BHT (256 entries), 64-entry BTB for register-indirect branches.
 
 `ifndef TINKER_START_PC
 `define TINKER_START_PC 64'h2000
@@ -16,11 +17,13 @@ module fetch_unit (
     output reg [31:0] out0_inst,
     output reg [63:0] out0_pc,
     output reg        out0_br_pred,
+    output reg [63:0] out0_pred_target,
     output reg        out0_valid,
 
     output reg [31:0] out1_inst,
     output reg [63:0] out1_pc,
     output reg        out1_br_pred,
+    output reg [63:0] out1_pred_target,
     output reg        out1_valid,
 
     input             flush,
@@ -29,7 +32,13 @@ module fetch_unit (
     input             bht_update_en,
     input      [63:0] bht_update_pc,
     input             bht_pred_taken,
-    input             bht_actual_taken
+    input             bht_actual_taken,
+
+    // BTB update from branch completion
+    input             btb_update_en,
+    input      [63:0] btb_update_pc,
+    input      [63:0] btb_update_target,
+    input             btb_update_taken
 );
 
     localparam OPC_BRR_L = 5'h0A;
@@ -52,12 +61,18 @@ module fetch_unit (
     reg [31:0] q_inst [0:15];
     reg [63:0] q_pc   [0:15];
     reg [15:0] q_pred;
+    reg [63:0] q_pred_target [0:15];
 
     reg [3:0] wr_ptr;
     reg [3:0] rd_ptr;
     reg [4:0] q_count;
 
+    // 1-bit BHT: 256 entries indexed by PC[9:2]
     reg [255:0] bht_bits;
+
+    // BTB: 64 entries indexed by PC[7:2], direct-mapped
+    reg [63:0] btb_valid;
+    reg [63:0] btb_target [0:63];
 
     assign instr_fetch_addr = {fetch_pc[63:6], 6'b0};
 
@@ -71,12 +86,16 @@ module fetch_unit (
     reg [4:0]  opc;
     reg        is_br;
     reg        pred_taken;
+    reg [63:0] pred_target;
     reg [63:0] se_L;
     reg        stop_line;
     reg [1:0]  take;
     reg [63:0] lbase;
     reg [3:0]  sw;
     reg [3:0]  rdp1;
+    reg [5:0]  btb_idx;
+
+    integer ri;
 
     always @(posedge clk or posedge reset) begin
         if (reset) begin
@@ -85,19 +104,32 @@ module fetch_unit (
             rd_ptr   <= 4'd0;
             q_count  <= 5'd0;
             bht_bits <= 256'b0;
+            btb_valid <= 64'b0;
 
-            out0_valid   <= 1'b0;
-            out1_valid   <= 1'b0;
-            out0_inst    <= 32'b0;
-            out0_pc      <= 64'b0;
-            out0_br_pred <= 1'b0;
-            out1_inst    <= 32'b0;
-            out1_pc      <= 64'b0;
-            out1_br_pred <= 1'b0;
+            out0_valid       <= 1'b0;
+            out1_valid       <= 1'b0;
+            out0_inst        <= 32'b0;
+            out0_pc          <= 64'b0;
+            out0_br_pred     <= 1'b0;
+            out0_pred_target <= 64'b0;
+            out1_inst        <= 32'b0;
+            out1_pc          <= 64'b0;
+            out1_br_pred     <= 1'b0;
+            out1_pred_target <= 64'b0;
+
+            for (ri = 0; ri < 64; ri = ri + 1)
+                btb_target[ri] <= 64'd0;
 
         end else begin
+            // BHT update: flip bit on misprediction
             if (bht_update_en && (bht_pred_taken != bht_actual_taken))
                 bht_bits[bht_update_pc[9:2]] <= ~bht_bits[bht_update_pc[9:2]];
+
+            // BTB update: store target for taken branches
+            if (btb_update_en && btb_update_taken) begin
+                btb_valid[btb_update_pc[7:2]]  <= 1'b1;
+                btb_target[btb_update_pc[7:2]] <= btb_update_target;
+            end
 
             if (flush) begin
                 fetch_pc <= flush_pc;
@@ -139,34 +171,48 @@ module fetch_unit (
                             insn_pc = lbase + (w << 2);
                             opc     = insn_w[31:27];
                             is_br   = is_branch_opcode(opc);
+                            btb_idx = insn_pc[7:2];
 
-                            // BRR_L: 12-bit signed L — backward branches (L[11]==1) are almost always
-                            // loop edges; cold 1-bit BHT starts at NT and destroys loop performance.
-                            // Static bias: predict taken on backward BRR_L; otherwise use BHT.
-                            // Only predict BRR_L — it is the sole branch type whose
-                            // target is computable at fetch time (PC-relative immediate).
-                            // Predicting taken for register-indirect branches (BRNZ,
-                            // BRGT, BR, BRR, CALL, RETURN) without redirecting fetch
-                            // would allow wrong-path instructions to commit.
-                            pred_taken = 1'b0;
-                            if (opc == OPC_BRR_L) begin
-                                if (insn_w[11])
-                                    pred_taken = 1'b1;      // static: backward = taken
-                                else
-                                    pred_taken = bht_bits[insn_pc[9:2]]; // BHT for forward
+                            pred_taken  = 1'b0;
+                            pred_target = insn_pc + 64'd4; // default: fall-through
+
+                            if (is_br) begin
+                                if (opc == OPC_BRR_L) begin
+                                    // BRR_L: target computable from immediate
+                                    se_L = {{52{insn_w[11]}}, insn_w[11:0]};
+                                    if (insn_w[11]) begin
+                                        // Backward: static predict taken
+                                        pred_taken  = 1'b1;
+                                        pred_target = insn_pc + se_L;
+                                    end else begin
+                                        // Forward: use BHT
+                                        pred_taken = bht_bits[insn_pc[9:2]];
+                                        if (pred_taken)
+                                            pred_target = insn_pc + se_L;
+                                    end
+                                end else begin
+                                    // Register-indirect branch (BRNZ, BRGT, BR, BRR, CALL, RETURN)
+                                    // Use BHT for taken/not-taken, BTB for target
+                                    if (bht_bits[insn_pc[9:2]] && btb_valid[btb_idx]) begin
+                                        pred_taken  = 1'b1;
+                                        pred_target = btb_target[btb_idx];
+                                    end
+                                    // else: predict not-taken (no BTB entry = can't redirect)
+                                end
                             end
 
-                            q_inst[wp] = insn_w;
-                            q_pc[wp]   = insn_pc;
-                            q_pred[wp] = pred_taken;
+                            q_inst[wp]        = insn_w;
+                            q_pc[wp]          = insn_pc;
+                            q_pred[wp]        = pred_taken;
+                            q_pred_target[wp] = pred_target;
 
                             wp  = inc_ptr(wp);
                             cnt = cnt + 5'd1;
                             fpc = insn_pc + 64'd4;
 
-                            if (opc == OPC_BRR_L && pred_taken) begin
-                                se_L = {{52{insn_w[11]}}, insn_w[11:0]};
-                                fpc = insn_pc + se_L;
+                            // Redirect fetch on predicted-taken branch
+                            if (is_br && pred_taken) begin
+                                fpc = pred_target;
                                 stop_line = 1'b1;
                             end
                         end
@@ -180,14 +226,16 @@ module fetch_unit (
 
                 rdp1 = inc_ptr(rp);
 
-                out0_valid   <= (cnt >= 5'd1);
-                out1_valid   <= (cnt >= 5'd2);
-                out0_inst    <= q_inst[rp];
-                out0_pc      <= q_pc[rp];
-                out0_br_pred <= q_pred[rp];
-                out1_inst    <= q_inst[rdp1];
-                out1_pc      <= q_pc[rdp1];
-                out1_br_pred <= q_pred[rdp1];
+                out0_valid       <= (cnt >= 5'd1);
+                out1_valid       <= (cnt >= 5'd2);
+                out0_inst        <= q_inst[rp];
+                out0_pc          <= q_pc[rp];
+                out0_br_pred     <= q_pred[rp];
+                out0_pred_target <= q_pred_target[rp];
+                out1_inst        <= q_inst[rdp1];
+                out1_pc          <= q_pc[rdp1];
+                out1_br_pred     <= q_pred[rdp1];
+                out1_pred_target <= q_pred_target[rdp1];
             end
         end
     end

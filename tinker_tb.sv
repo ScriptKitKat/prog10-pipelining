@@ -101,8 +101,6 @@ module tinker_tb;
 
     // ================================================================
     // TEST 1: Basic ALU with RAW dependency
-    //   addi r1, #5; addi r1, #3; halt
-    //   Expect: r1 = 8
     // ================================================================
     task test1_basic_alu;
         begin
@@ -120,8 +118,6 @@ module tinker_tb;
 
     // ================================================================
     // TEST 2: Dual-issue independent ALU
-    //   addi r1, #10; addi r2, #20; halt
-    //   Expect: r1=10, r2=20
     // ================================================================
     task test2_dual_issue;
         begin
@@ -140,20 +136,14 @@ module tinker_tb;
 
     // ================================================================
     // TEST 3: Load / Store
-    //   movi r1, #100; store (r0)(0), r1; load r3, (r0)(0); halt
-    //   Expect: r3 = 100
     // ================================================================
     task test3_load_store;
         begin
             $display("\n=== TEST 3: Load / Store ===");
             do_reset;
-            // movi r1, #100 → r1[11:0] = 100
             store_instr(64'h2000, mk_instr(OP_MOVI, 5'd1, 5'd0, 5'd0, 12'd100));
-            // store (r0)(0), r1 → mem[r0+0] = r1   {5'h13, rd=0, rs=1, rt=0, L=0}
             store_instr(64'h2004, mk_instr(OP_STORE, 5'd0, 5'd1, 5'd0, 12'd0));
-            // load r3, (r0)(0) → r3 = mem[r0+0]    {5'h10, rd=3, rs=0, rt=0, L=0}
             store_instr(64'h2008, mk_instr(OP_LOAD, 5'd3, 5'd0, 5'd0, 12'd0));
-            // halt
             store_instr(64'h200c, mk_instr(OP_HALT, 5'd0, 5'd0, 5'd0, 12'd0));
             run_until_halt(500, cycle_count);
             $display("  Completed in %0d cycles", cycle_count);
@@ -163,49 +153,15 @@ module tinker_tb;
     endtask
 
     // ================================================================
-    // TEST 4: Branch (BRNZ taken)
-    //   movi r1, #1;                 (0x2000)
-    //   brnz r1, r4                  (0x2004) where r4=target=0x2010
-    //   addi r2, #99;                (0x2008) ← should NOT commit
-    //   addi r2, #99;                (0x200c) ← padding (should NOT commit)
-    //   target: addi r3, #42;        (0x2010)
-    //   halt                         (0x2014)
-    //
-    //   For BRNZ: src1=rs(condition), src2=rd(target addr)
-    //   Encoding: {OP_BRNZ, rd, rs, rt, L}
-    //   We need rd to hold the target. Set r4=0x2010 first.
-    //
-    //   Revised program:
-    //   0x2000: movi r1, #1         r1 = 1 (condition)
-    //   0x2004: movi r4, #0x10      r4[11:0] = 0x10 (low 12 bits of 0x2010)
-    //   0x2008: movi r4, #0x10      NOP-like (re-movi same value, just padding)
-    //   Wait: MOVI sets r4[11:0]=0x10, r4[63:12]=0. But target 0x2010
-    //   requires encoding the full address. Since r4 starts as 0, movi
-    //   will give r4 = 0x010. But 0x2010 doesn't fit in 12 bits.
-    //
-    //   Simpler approach: use BRR_L (relative branch, unconditional) to
-    //   jump over the dead code:
-    //   0x2000: movi r1, #1
-    //   0x2004: brnz r1, r4  → but r4 must hold 0x2010...
-    //
-    //   Even simpler: use relative branch with BRR L:
-    //   0x2000: movi r1, #42         r1 = 42
-    //   0x2004: brr_l #8             pc += 8 → jumps to 0x200c
-    //   0x2008: movi r2, #99         ← should NOT commit (flushed)
-    //   0x200c: halt
-    //   Expect: r1=42, r2=0
+    // TEST 4: Branch (BRR_L unconditional relative)
     // ================================================================
     task test4_branch;
         begin
             $display("\n=== TEST 4: Branch (BRR_L unconditional relative) ===");
             do_reset;
-            // movi r1, #42
             store_instr(64'h2000, mk_instr(OP_MOVI, 5'd1, 5'd0, 5'd0, 12'd42));
-            // brr_l #8: PC-relative jump, target = PC + imm = 0x2004 + 8 = 0x200c
             store_instr(64'h2004, mk_instr(OP_BRR_L, 5'd0, 5'd0, 5'd0, 12'd8));
-            // This instruction is after the branch; it should be flushed
             store_instr(64'h2008, mk_instr(OP_MOVI, 5'd2, 5'd0, 5'd0, 12'd99));
-            // Target: halt
             store_instr(64'h200c, mk_instr(OP_HALT, 5'd0, 5'd0, 5'd0, 12'd0));
             run_until_halt(500, cycle_count);
             $display("  Completed in %0d cycles", cycle_count);
@@ -217,38 +173,18 @@ module tinker_tb;
 
     // ================================================================
     // TEST 5: FPU (FADD)
-    //   Pre-load two IEEE 754 doubles into memory, load them into
-    //   registers, do FADD, verify result.
-    //   1.5 + 2.5 = 4.0
-    //   IEEE 754: 1.5 = 64'h3FF8000000000000
-    //             2.5 = 64'h4004000000000000
-    //             4.0 = 64'h4010000000000000
     // ================================================================
     task test5_fpu;
         begin
             $display("\n=== TEST 5: FPU (FADD 1.5 + 2.5 = 4.0) ===");
             do_reset;
-            // Pre-store doubles in data memory
-            store_dword(64'h3000, 64'h3FF8000000000000);  // 1.5 at addr 0x3000
-            store_dword(64'h3008, 64'h4004000000000000);  // 2.5 at addr 0x3008
-            // Program:
-            // movi r4, addr-low for 0x3000: need to set r4 = 0x3000
-            // Can't fit 0x3000 in 12-bit immediate directly.
-            // Use addi sequence: addi r4, #0; then shift left, etc.
-            // Simpler: use movi + shftli to build address
-            // r4 = 0x3000 = 0x3 << 12
-            // movi r4, #0    → r4 = 0
-            // addi r4, #3    → r4 = 3
-            // shftli r4, #12 → r4 = 0x3000
+            store_dword(64'h3000, 64'h3FF8000000000000);
+            store_dword(64'h3008, 64'h4004000000000000);
             store_instr(64'h2000, mk_instr(OP_ADDI, 5'd4, 5'd0, 5'd0, 12'd3));
             store_instr(64'h2004, mk_instr(OP_SHFTLI, 5'd4, 5'd0, 5'd0, 12'd12));
-            // load r1, (r4)(0) → r1 = mem[0x3000] = 1.5
             store_instr(64'h2008, mk_instr(OP_LOAD, 5'd1, 5'd4, 5'd0, 12'd0));
-            // load r2, (r4)(8) → r2 = mem[0x3008] = 2.5
             store_instr(64'h200c, mk_instr(OP_LOAD, 5'd2, 5'd4, 5'd0, 12'd8));
-            // fadd r3, r1, r2 → r3 = 1.5 + 2.5 = 4.0
             store_instr(64'h2010, mk_instr(OP_FADD, 5'd3, 5'd1, 5'd2, 12'd0));
-            // halt
             store_instr(64'h2014, mk_instr(OP_HALT, 5'd0, 5'd0, 5'd0, 12'd0));
             run_until_halt(1000, cycle_count);
             $display("  Completed in %0d cycles", cycle_count);
@@ -258,10 +194,7 @@ module tinker_tb;
     endtask
 
     // ================================================================
-    // TEST 6: Mixed ILP — 6 independent ALU instructions
-    //   addi r1, #1; addi r2, #2; addi r3, #3;
-    //   addi r4, #4; addi r5, #5; addi r6, #6; halt
-    //   All independent — should see maximum throughput.
+    // TEST 6: Mixed ILP -- 6 independent ALU instructions
     // ================================================================
     task test6_mixed_ilp;
         begin
@@ -287,6 +220,71 @@ module tinker_tb;
     endtask
 
     // ================================================================
+    // TEST 7: Branch loop (BRNZ countdown, 10 iters)
+    //   Setup: load r3 = 0x2008 (loop top), movi r1 = 10
+    //   Loop:  addi r2, r2, #1   (0x2008)
+    //          subi r1, r1, #1   (0x200c)
+    //          brnz r1, r3       (0x2010) -> r3=0x2008 if r1!=0
+    //   halt                     (0x2014)
+    //   After: r1=0, r2=10
+    // ================================================================
+    task test7_branch_loop;
+        begin
+            $display("\n=== TEST 7: Branch loop (BRNZ countdown, 10 iters) ===");
+            do_reset;
+            // Store loop-top address at memory address 0x100
+            store_dword(64'h0100, 64'h2008);
+            // movi r1, #10 (counter)
+            store_instr(64'h2000, mk_instr(OP_MOVI, 5'd1, 5'd0, 5'd0, 12'd10));
+            // load r3, [r0 + 0x100] -> r3 = 0x2008 (loop target)
+            store_instr(64'h2004, mk_instr(OP_LOAD, 5'd3, 5'd0, 5'd0, 12'h100));
+            // loop body: addi r2, r2, #1       (0x2008)
+            store_instr(64'h2008, mk_instr(OP_ADDI, 5'd2, 5'd2, 5'd0, 12'd1));
+            // subi r1, r1, #1                  (0x200c)
+            store_instr(64'h200c, mk_instr(OP_SUBI, 5'd1, 5'd1, 5'd0, 12'd1));
+            // brnz rd=r3(target), rs=r1(condition) (0x2010)
+            store_instr(64'h2010, mk_instr(OP_BRNZ, 5'd3, 5'd1, 5'd0, 12'd0));
+            // halt
+            store_instr(64'h2014, mk_instr(OP_HALT, 5'd0, 5'd0, 5'd0, 12'd0));
+
+            run_until_halt(5000, cycle_count);
+            $display("  Completed in %0d cycles", cycle_count);
+            check_reg(1, 64'd0, "test7 r1 (counter=0)");
+            check_reg(2, 64'd10, "test7 r2 (accum=10)");
+            check_hlt("test7");
+        end
+    endtask
+
+    // ================================================================
+    // TEST 8: Larger BRNZ loop (100 iters) -- BTB should help
+    // ================================================================
+    task test8_brnz_large_loop;
+        begin
+            $display("\n=== TEST 8: BRNZ loop (100 iters, BTB benefit) ===");
+            do_reset;
+            store_dword(64'h0100, 64'h2008);
+            // movi r1, #100 (counter)
+            store_instr(64'h2000, mk_instr(OP_MOVI, 5'd1, 5'd0, 5'd0, 12'd100));
+            // load r3, [r0 + 0x100] -> r3 = 0x2008
+            store_instr(64'h2004, mk_instr(OP_LOAD, 5'd3, 5'd0, 5'd0, 12'h100));
+            // loop: addi r2, r2, #1         (0x2008)
+            store_instr(64'h2008, mk_instr(OP_ADDI, 5'd2, 5'd2, 5'd0, 12'd1));
+            // subi r1, r1, #1               (0x200c)
+            store_instr(64'h200c, mk_instr(OP_SUBI, 5'd1, 5'd1, 5'd0, 12'd1));
+            // brnz rd=r3, rs=r1             (0x2010)
+            store_instr(64'h2010, mk_instr(OP_BRNZ, 5'd3, 5'd1, 5'd0, 12'd0));
+            // halt
+            store_instr(64'h2014, mk_instr(OP_HALT, 5'd0, 5'd0, 5'd0, 12'd0));
+
+            run_until_halt(50000, cycle_count);
+            $display("  Completed in %0d cycles", cycle_count);
+            check_reg(1, 64'd0, "test8 r1 (counter=0)");
+            check_reg(2, 64'd100, "test8 r2 (accum=100)");
+            check_hlt("test8");
+        end
+    endtask
+
+    // ================================================================
     // Main test driver
     // ================================================================
     initial begin
@@ -303,6 +301,8 @@ module tinker_tb;
         test4_branch;
         test5_fpu;
         test6_mixed_ilp;
+        test7_branch_loop;
+        test8_brnz_large_loop;
 
         $display("\n========================================");
         $display("  Results: %0d passed, %0d failed", pass_count, fail_count);

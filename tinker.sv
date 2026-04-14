@@ -139,6 +139,7 @@ module tinker (
     wire [31:0] fu_inst0, fu_inst1;
     wire [63:0] fu_pc0, fu_pc1;
     wire        fu_br_pred0, fu_br_pred1;
+    wire [63:0] fu_pred_target0, fu_pred_target1;
     wire        fu_valid0, fu_valid1;
     wire [1:0]  decode_take;
     wire        fetch_flush;
@@ -146,17 +147,24 @@ module tinker (
     wire        bht_update_en;
     wire [63:0] bht_update_pc;
     wire        bht_pred_taken, bht_actual_taken;
+    wire        btb_update_en;
+    wire [63:0] btb_update_pc, btb_update_target;
+    wire        btb_update_taken;
 
     fetch_unit u_fu (
         .clk(clk), .reset(reset),
         .instr_fetch_addr(mem_instr_fetch_addr),
         .instr_fetch_data(mem_instr_fetch_data),
         .decode_take(decode_take),
-        .out0_inst(fu_inst0), .out0_pc(fu_pc0), .out0_br_pred(fu_br_pred0), .out0_valid(fu_valid0),
-        .out1_inst(fu_inst1), .out1_pc(fu_pc1), .out1_br_pred(fu_br_pred1), .out1_valid(fu_valid1),
+        .out0_inst(fu_inst0), .out0_pc(fu_pc0), .out0_br_pred(fu_br_pred0),
+        .out0_pred_target(fu_pred_target0), .out0_valid(fu_valid0),
+        .out1_inst(fu_inst1), .out1_pc(fu_pc1), .out1_br_pred(fu_br_pred1),
+        .out1_pred_target(fu_pred_target1), .out1_valid(fu_valid1),
         .flush(fetch_flush), .flush_pc(fetch_flush_pc),
         .bht_update_en(bht_update_en), .bht_update_pc(bht_update_pc),
-        .bht_pred_taken(bht_pred_taken), .bht_actual_taken(bht_actual_taken)
+        .bht_pred_taken(bht_pred_taken), .bht_actual_taken(bht_actual_taken),
+        .btb_update_en(btb_update_en), .btb_update_pc(btb_update_pc),
+        .btb_update_target(btb_update_target), .btb_update_taken(btb_update_taken)
     );
 
     // ================================================================
@@ -257,6 +265,7 @@ module tinker (
     wire [4:0]  dr_rs_alu_ri_a, dr_rs_alu_ri_b;
     wire [63:0] dr_rs_alu_imm_a, dr_rs_alu_imm_b, dr_rs_alu_pc_a, dr_rs_alu_pc_b;
     wire        dr_rs_alu_bp_a, dr_rs_alu_bp_b;
+    wire [63:0] dr_rs_alu_pt_a, dr_rs_alu_pt_b;
 
     // RS FPU dispatch wires
     wire        dr_rs_fpu_en_a, dr_rs_fpu_en_b;
@@ -280,8 +289,8 @@ module tinker (
     wire [6:0]  dr_lsq_st_dtag_a, dr_lsq_st_dtag_b;
 
     decode_rename u_dr (
-        .in0_inst(fu_inst0), .in0_pc(fu_pc0), .in0_br_pred(fu_br_pred0), .in0_valid(fu_valid0 && !do_flush && !flush_active),
-        .in1_inst(fu_inst1), .in1_pc(fu_pc1), .in1_br_pred(fu_br_pred1), .in1_valid(fu_valid1 && !do_flush && !flush_active),
+        .in0_inst(fu_inst0), .in0_pc(fu_pc0), .in0_br_pred(fu_br_pred0), .in0_pred_target(fu_pred_target0), .in0_valid(fu_valid0 && !do_flush && !flush_active),
+        .in1_inst(fu_inst1), .in1_pc(fu_pc1), .in1_br_pred(fu_br_pred1), .in1_pred_target(fu_pred_target1), .in1_valid(fu_valid1 && !do_flush && !flush_active),
         .rob_full(rob_full),
         .free_list_empty(fl_empty), .free_list_almost_empty(fl_almost_empty),
         .rs_alu_full(rs_alu_full_w), .rs_alu_almost_full(rs_alu_almost_full_w),
@@ -319,12 +328,12 @@ module tinker (
         .rs_alu_dispatch_src1_val_a(dr_rs_alu_s1v_a), .rs_alu_dispatch_src1_tag_a(dr_rs_alu_s1t_a), .rs_alu_dispatch_src1_rdy_a(dr_rs_alu_s1r_a),
         .rs_alu_dispatch_src2_val_a(dr_rs_alu_s2v_a), .rs_alu_dispatch_src2_tag_a(dr_rs_alu_s2t_a), .rs_alu_dispatch_src2_rdy_a(dr_rs_alu_s2r_a),
         .rs_alu_dispatch_dest_tag_a(dr_rs_alu_dt_a), .rs_alu_dispatch_rob_idx_a(dr_rs_alu_ri_a),
-        .rs_alu_dispatch_imm_a(dr_rs_alu_imm_a), .rs_alu_dispatch_pc_a(dr_rs_alu_pc_a), .rs_alu_dispatch_br_pred_a(dr_rs_alu_bp_a),
+        .rs_alu_dispatch_imm_a(dr_rs_alu_imm_a), .rs_alu_dispatch_pc_a(dr_rs_alu_pc_a), .rs_alu_dispatch_br_pred_a(dr_rs_alu_bp_a), .rs_alu_dispatch_pred_target_a(dr_rs_alu_pt_a),
         .rs_alu_dispatch_en_b(dr_rs_alu_en_b), .rs_alu_dispatch_opcode_b(dr_rs_alu_opc_b),
         .rs_alu_dispatch_src1_val_b(dr_rs_alu_s1v_b), .rs_alu_dispatch_src1_tag_b(dr_rs_alu_s1t_b), .rs_alu_dispatch_src1_rdy_b(dr_rs_alu_s1r_b),
         .rs_alu_dispatch_src2_val_b(dr_rs_alu_s2v_b), .rs_alu_dispatch_src2_tag_b(dr_rs_alu_s2t_b), .rs_alu_dispatch_src2_rdy_b(dr_rs_alu_s2r_b),
         .rs_alu_dispatch_dest_tag_b(dr_rs_alu_dt_b), .rs_alu_dispatch_rob_idx_b(dr_rs_alu_ri_b),
-        .rs_alu_dispatch_imm_b(dr_rs_alu_imm_b), .rs_alu_dispatch_pc_b(dr_rs_alu_pc_b), .rs_alu_dispatch_br_pred_b(dr_rs_alu_bp_b),
+        .rs_alu_dispatch_imm_b(dr_rs_alu_imm_b), .rs_alu_dispatch_pc_b(dr_rs_alu_pc_b), .rs_alu_dispatch_br_pred_b(dr_rs_alu_bp_b), .rs_alu_dispatch_pred_target_b(dr_rs_alu_pt_b),
         // RS FPU
         .rs_fpu_dispatch_en_a(dr_rs_fpu_en_a), .rs_fpu_dispatch_opcode_a(dr_rs_fpu_opc_a),
         .rs_fpu_dispatch_src1_val_a(dr_rs_fpu_s1v_a), .rs_fpu_dispatch_src1_tag_a(dr_rs_fpu_s1t_a), .rs_fpu_dispatch_src1_rdy_a(dr_rs_fpu_s1r_a),
@@ -355,6 +364,7 @@ module tinker (
     wire [4:0]  alu_rs_iri0, alu_rs_iri1;
     wire [63:0] alu_rs_iimm0, alu_rs_iimm1, alu_rs_ipc0, alu_rs_ipc1;
     wire        alu_rs_ibp0, alu_rs_ibp1;
+    wire [63:0] alu_rs_ipt0, alu_rs_ipt1;
     wire        alu_rs_grant0, alu_rs_grant1;
 
     reservation_station #(.NUM_ENTRIES(8)) u_rs_alu (
@@ -363,24 +373,24 @@ module tinker (
         .dispatch_src1_value0(dr_rs_alu_s1v_a), .dispatch_src1_tag0(dr_rs_alu_s1t_a), .dispatch_src1_ready0(dr_rs_alu_s1r_a),
         .dispatch_src2_value0(dr_rs_alu_s2v_a), .dispatch_src2_tag0(dr_rs_alu_s2t_a), .dispatch_src2_ready0(dr_rs_alu_s2r_a),
         .dispatch_dest_tag0(dr_rs_alu_dt_a), .dispatch_rob_idx0(dr_rs_alu_ri_a),
-        .dispatch_imm0(dr_rs_alu_imm_a), .dispatch_pc0(dr_rs_alu_pc_a), .dispatch_br_pred0(dr_rs_alu_bp_a),
+        .dispatch_imm0(dr_rs_alu_imm_a), .dispatch_pc0(dr_rs_alu_pc_a), .dispatch_br_pred0(dr_rs_alu_bp_a), .dispatch_pred_target0(dr_rs_alu_pt_a),
         .dispatch_en1(dr_rs_alu_en_b), .dispatch_opcode1(dr_rs_alu_opc_b),
         .dispatch_src1_value1(dr_rs_alu_s1v_b), .dispatch_src1_tag1(dr_rs_alu_s1t_b), .dispatch_src1_ready1(dr_rs_alu_s1r_b),
         .dispatch_src2_value1(dr_rs_alu_s2v_b), .dispatch_src2_tag1(dr_rs_alu_s2t_b), .dispatch_src2_ready1(dr_rs_alu_s2r_b),
         .dispatch_dest_tag1(dr_rs_alu_dt_b), .dispatch_rob_idx1(dr_rs_alu_ri_b),
-        .dispatch_imm1(dr_rs_alu_imm_b), .dispatch_pc1(dr_rs_alu_pc_b), .dispatch_br_pred1(dr_rs_alu_bp_b),
+        .dispatch_imm1(dr_rs_alu_imm_b), .dispatch_pc1(dr_rs_alu_pc_b), .dispatch_br_pred1(dr_rs_alu_bp_b), .dispatch_pred_target1(dr_rs_alu_pt_b),
         .full(rs_alu_full_w), .almost_full(rs_alu_almost_full_w),
         .cdb_valid0(cdb_valid_bus0), .cdb_tag0(cdb_tag_bus0), .cdb_value0(cdb_value_bus0),
         .cdb_valid1(cdb_valid_bus1), .cdb_tag1(cdb_tag_bus1), .cdb_value1(cdb_value_bus1),
         .issue_valid0(alu_rs_iv0), .issue_opcode0(alu_rs_iopc0),
         .issue_src1_value0(alu_rs_is1v0), .issue_src2_value0(alu_rs_is2v0),
         .issue_dest_tag0(alu_rs_idt0), .issue_rob_idx0(alu_rs_iri0),
-        .issue_imm0(alu_rs_iimm0), .issue_pc0(alu_rs_ipc0), .issue_br_pred0(alu_rs_ibp0),
+        .issue_imm0(alu_rs_iimm0), .issue_pc0(alu_rs_ipc0), .issue_br_pred0(alu_rs_ibp0), .issue_pred_target0(alu_rs_ipt0),
         .issue_grant0(alu_rs_grant0),
         .issue_valid1(alu_rs_iv1), .issue_opcode1(alu_rs_iopc1),
         .issue_src1_value1(alu_rs_is1v1), .issue_src2_value1(alu_rs_is2v1),
         .issue_dest_tag1(alu_rs_idt1), .issue_rob_idx1(alu_rs_iri1),
-        .issue_imm1(alu_rs_iimm1), .issue_pc1(alu_rs_ipc1), .issue_br_pred1(alu_rs_ibp1),
+        .issue_imm1(alu_rs_iimm1), .issue_pc1(alu_rs_ipc1), .issue_br_pred1(alu_rs_ibp1), .issue_pred_target1(alu_rs_ipt1),
         .issue_grant1(alu_rs_grant1),
         .flush_en(do_flush), .flush_rob_idx(flush_rob_idx_w), .rob_head_idx(rob_head_idx)
     );
@@ -403,24 +413,24 @@ module tinker (
         .dispatch_src1_value0(dr_rs_fpu_s1v_a), .dispatch_src1_tag0(dr_rs_fpu_s1t_a), .dispatch_src1_ready0(dr_rs_fpu_s1r_a),
         .dispatch_src2_value0(dr_rs_fpu_s2v_a), .dispatch_src2_tag0(dr_rs_fpu_s2t_a), .dispatch_src2_ready0(dr_rs_fpu_s2r_a),
         .dispatch_dest_tag0(dr_rs_fpu_dt_a), .dispatch_rob_idx0(dr_rs_fpu_ri_a),
-        .dispatch_imm0(dr_rs_fpu_imm_a), .dispatch_pc0(dr_rs_fpu_pc_a), .dispatch_br_pred0(dr_rs_fpu_bp_a),
+        .dispatch_imm0(dr_rs_fpu_imm_a), .dispatch_pc0(dr_rs_fpu_pc_a), .dispatch_br_pred0(dr_rs_fpu_bp_a), .dispatch_pred_target0(64'd0),
         .dispatch_en1(dr_rs_fpu_en_b), .dispatch_opcode1(dr_rs_fpu_opc_b),
         .dispatch_src1_value1(dr_rs_fpu_s1v_b), .dispatch_src1_tag1(dr_rs_fpu_s1t_b), .dispatch_src1_ready1(dr_rs_fpu_s1r_b),
         .dispatch_src2_value1(dr_rs_fpu_s2v_b), .dispatch_src2_tag1(dr_rs_fpu_s2t_b), .dispatch_src2_ready1(dr_rs_fpu_s2r_b),
         .dispatch_dest_tag1(dr_rs_fpu_dt_b), .dispatch_rob_idx1(dr_rs_fpu_ri_b),
-        .dispatch_imm1(dr_rs_fpu_imm_b), .dispatch_pc1(dr_rs_fpu_pc_b), .dispatch_br_pred1(dr_rs_fpu_bp_b),
+        .dispatch_imm1(dr_rs_fpu_imm_b), .dispatch_pc1(dr_rs_fpu_pc_b), .dispatch_br_pred1(dr_rs_fpu_bp_b), .dispatch_pred_target1(64'd0),
         .full(rs_fpu_full_w), .almost_full(rs_fpu_almost_full_w),
         .cdb_valid0(cdb_valid_bus0), .cdb_tag0(cdb_tag_bus0), .cdb_value0(cdb_value_bus0),
         .cdb_valid1(cdb_valid_bus1), .cdb_tag1(cdb_tag_bus1), .cdb_value1(cdb_value_bus1),
         .issue_valid0(fpu_rs_iv0), .issue_opcode0(fpu_rs_iopc0),
         .issue_src1_value0(fpu_rs_is1v0), .issue_src2_value0(fpu_rs_is2v0),
         .issue_dest_tag0(fpu_rs_idt0), .issue_rob_idx0(fpu_rs_iri0),
-        .issue_imm0(fpu_rs_iimm0), .issue_pc0(fpu_rs_ipc0), .issue_br_pred0(fpu_rs_ibp0),
+        .issue_imm0(fpu_rs_iimm0), .issue_pc0(fpu_rs_ipc0), .issue_br_pred0(fpu_rs_ibp0), .issue_pred_target0(),
         .issue_grant0(fpu_rs_grant0),
         .issue_valid1(fpu_rs_iv1), .issue_opcode1(fpu_rs_iopc1),
         .issue_src1_value1(fpu_rs_is1v1), .issue_src2_value1(fpu_rs_is2v1),
         .issue_dest_tag1(fpu_rs_idt1), .issue_rob_idx1(fpu_rs_iri1),
-        .issue_imm1(fpu_rs_iimm1), .issue_pc1(fpu_rs_ipc1), .issue_br_pred1(fpu_rs_ibp1),
+        .issue_imm1(fpu_rs_iimm1), .issue_pc1(fpu_rs_ipc1), .issue_br_pred1(fpu_rs_ibp1), .issue_pred_target1(),
         .issue_grant1(fpu_rs_grant1),
         .flush_en(do_flush), .flush_rob_idx(flush_rob_idx_w), .rob_head_idx(rob_head_idx)
     );
@@ -453,7 +463,7 @@ module tinker (
         .valid_in(alu_rs_iv0 && alu_rs_grant0),
         .opcode_in(alu_rs_iopc0), .src1_in(alu_rs_is1v0), .src2_in(alu_rs_is2v0),
         .dest_tag_in(alu_rs_idt0), .rob_idx_in(alu_rs_iri0),
-        .imm_in(alu_rs_iimm0), .pc_in(alu_rs_ipc0), .br_pred_taken_in(alu_rs_ibp0),
+        .imm_in(alu_rs_iimm0), .pc_in(alu_rs_ipc0), .br_pred_taken_in(alu_rs_ibp0), .pred_target_in(alu_rs_ipt0),
         .pipe_ready(alu0_ready),
         .valid_out(alu0_valid_out), .opcode_out(alu0_opc_out),
         .dest_tag_out(alu0_dt_out), .rob_idx_out(alu0_ri_out),
@@ -468,7 +478,7 @@ module tinker (
         .valid_in(alu_rs_iv1 && alu_rs_grant1),
         .opcode_in(alu_rs_iopc1), .src1_in(alu_rs_is1v1), .src2_in(alu_rs_is2v1),
         .dest_tag_in(alu_rs_idt1), .rob_idx_in(alu_rs_iri1),
-        .imm_in(alu_rs_iimm1), .pc_in(alu_rs_ipc1), .br_pred_taken_in(alu_rs_ibp1),
+        .imm_in(alu_rs_iimm1), .pc_in(alu_rs_ipc1), .br_pred_taken_in(alu_rs_ibp1), .pred_target_in(alu_rs_ipt1),
         .pipe_ready(alu1_ready),
         .valid_out(alu1_valid_out), .opcode_out(alu1_opc_out),
         .dest_tag_out(alu1_dt_out), .rob_idx_out(alu1_ri_out),
@@ -711,6 +721,23 @@ module tinker (
                             ((cdb_win1_id == 3'd0) ? u_alu0.s2_br_pred : u_alu1.s2_br_pred);
 
     assign bht_actual_taken = bht_bus0_is_br ?
+                              ((cdb_win0_id == 3'd0) ? alu0_br_taken : alu1_br_taken) :
+                              ((cdb_win1_id == 3'd0) ? alu0_br_taken : alu1_br_taken);
+
+    // ================================================================
+    // BTB update on branch completion via CDB
+    // ================================================================
+    assign btb_update_en = bht_bus0_is_br || bht_bus1_is_br;
+
+    assign btb_update_pc = bht_bus0_is_br ?
+                           ((cdb_win0_id == 3'd0) ? u_alu0.s2_pc : u_alu1.s2_pc) :
+                           ((cdb_win1_id == 3'd0) ? u_alu0.s2_pc : u_alu1.s2_pc);
+
+    assign btb_update_target = bht_bus0_is_br ?
+                               ((cdb_win0_id == 3'd0) ? alu0_br_target : alu1_br_target) :
+                               ((cdb_win1_id == 3'd0) ? alu0_br_target : alu1_br_target);
+
+    assign btb_update_taken = bht_bus0_is_br ?
                               ((cdb_win0_id == 3'd0) ? alu0_br_taken : alu1_br_taken) :
                               ((cdb_win1_id == 3'd0) ? alu0_br_taken : alu1_br_taken);
 

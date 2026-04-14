@@ -25,6 +25,7 @@ module reservation_station #(
     input  [63:0] dispatch_imm0,
     input  [63:0] dispatch_pc0,
     input         dispatch_br_pred0,
+    input  [63:0] dispatch_pred_target0,
 
     // --- Dispatch port 1 ---
     input         dispatch_en1,
@@ -40,6 +41,7 @@ module reservation_station #(
     input  [63:0] dispatch_imm1,
     input  [63:0] dispatch_pc1,
     input         dispatch_br_pred1,
+    input  [63:0] dispatch_pred_target1,
 
     output        full,
     output        almost_full,
@@ -62,6 +64,7 @@ module reservation_station #(
     output reg [63:0] issue_imm0,
     output reg [63:0] issue_pc0,
     output reg        issue_br_pred0,
+    output reg [63:0] issue_pred_target0,
     input             issue_grant0,
 
     // --- Issue port 1 (second oldest ready, combinational) ---
@@ -74,6 +77,7 @@ module reservation_station #(
     output reg [63:0] issue_imm1,
     output reg [63:0] issue_pc1,
     output reg        issue_br_pred1,
+    output reg [63:0] issue_pred_target1,
     input             issue_grant1,
 
     // --- Flush interface ---
@@ -98,6 +102,7 @@ module reservation_station #(
     reg [4:0]  entry_rob_idx  [0:NUM_ENTRIES-1];
     reg [63:0] entry_imm      [0:NUM_ENTRIES-1];
     reg [63:0] entry_pc       [0:NUM_ENTRIES-1];
+    reg [63:0] entry_pred_tgt[0:NUM_ENTRIES-1];
 
     // --- Free-slot finder (find first two free) ---
     integer fi;
@@ -136,10 +141,12 @@ module reservation_station #(
         issue_valid0 = 0; issue_opcode0 = 0; issue_src1_value0 = 0;
         issue_src2_value0 = 0; issue_dest_tag0 = 0;
         issue_rob_idx0 = 0; issue_imm0 = 0; issue_pc0 = 0; issue_br_pred0 = 0;
+        issue_pred_target0 = 0;
 
         issue_valid1 = 0; issue_opcode1 = 0; issue_src1_value1 = 0;
         issue_src2_value1 = 0; issue_dest_tag1 = 0;
         issue_rob_idx1 = 0; issue_imm1 = 0; issue_pc1 = 0; issue_br_pred1 = 0;
+        issue_pred_target1 = 0;
 
         // Pass 1: find oldest ready
         for (ii = 0; ii < NUM_ENTRIES; ii = ii + 1) begin
@@ -176,6 +183,7 @@ module reservation_station #(
             issue_imm0        = entry_imm[sel0];
             issue_pc0         = entry_pc[sel0];
             issue_br_pred0    = entry_br_pred[sel0];
+            issue_pred_target0 = entry_pred_tgt[sel0];
         end
         if (found1) begin
             issue_valid1      = 1;
@@ -187,6 +195,7 @@ module reservation_station #(
             issue_imm1        = entry_imm[sel1];
             issue_pc1         = entry_pc[sel1];
             issue_br_pred1    = entry_br_pred[sel1];
+            issue_pred_target1 = entry_pred_tgt[sel1];
         end
     end
 
@@ -208,6 +217,7 @@ module reservation_station #(
                 entry_rob_idx[si]  <= 5'd0;
                 entry_imm[si]      <= 64'd0;
                 entry_pc[si]       <= 64'd0;
+                entry_pred_tgt[si] <= 64'd0;
             end
         end else begin
             // ---- Dispatch ----
@@ -225,6 +235,7 @@ module reservation_station #(
                 entry_imm[free_slot0]      <= dispatch_imm0;
                 entry_pc[free_slot0]       <= dispatch_pc0;
                 entry_br_pred[free_slot0]  <= dispatch_br_pred0;
+                entry_pred_tgt[free_slot0] <= dispatch_pred_target0;
             end
             if (dispatch_en1 && has_free1) begin
                 entry_valid[free_slot1]    <= 1'b1;
@@ -240,6 +251,7 @@ module reservation_station #(
                 entry_imm[free_slot1]      <= dispatch_imm1;
                 entry_pc[free_slot1]       <= dispatch_pc1;
                 entry_br_pred[free_slot1]  <= dispatch_br_pred1;
+                entry_pred_tgt[free_slot1] <= dispatch_pred_target1;
             end
 
             // ---- CDB snoop ----

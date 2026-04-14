@@ -27,6 +27,7 @@ module alu_pipe (
     input  [63:0] imm_in,
     input  [63:0] pc_in,
     input         br_pred_taken_in,
+    input  [63:0] pred_target_in,     // predicted branch target from fetch BTB
 
     output        pipe_ready,   // can accept new instruction this cycle
 
@@ -51,6 +52,7 @@ module alu_pipe (
     reg [6:0]  s1_dest_tag;
     reg [4:0]  s1_rob_idx;
     reg        s1_br_pred;
+    reg [63:0] s1_pred_target;
 
     // ----------------------------------------------------------------
     // Stage-1 combinational result
@@ -157,6 +159,7 @@ module alu_pipe (
     reg [63:0] s2_branch_target;
     reg        s2_br_pred;
     reg [63:0] s2_pc;
+    reg [63:0] s2_pred_target;
 
     // ----------------------------------------------------------------
     // Stall / ready logic
@@ -187,29 +190,32 @@ module alu_pipe (
             s2_branch_target <= s1_branch_target_c;
             s2_br_pred       <= s1_br_pred;
             s2_pc            <= s1_pc;
+            s2_pred_target   <= s1_pred_target;
 
             // Stage 1 ← input
-            s1_valid    <= valid_in;
-            s1_opcode   <= opcode_in;
-            s1_src1     <= src1_in;
-            s1_src2     <= src2_in;
-            s1_dest_tag <= dest_tag_in;
-            s1_rob_idx  <= rob_idx_in;
-            s1_imm      <= imm_in;
-            s1_pc       <= pc_in;
-            s1_br_pred  <= br_pred_taken_in;
+            s1_valid       <= valid_in;
+            s1_opcode      <= opcode_in;
+            s1_src1        <= src1_in;
+            s1_src2        <= src2_in;
+            s1_dest_tag    <= dest_tag_in;
+            s1_rob_idx     <= rob_idx_in;
+            s1_imm         <= imm_in;
+            s1_pc          <= pc_in;
+            s1_br_pred     <= br_pred_taken_in;
+            s1_pred_target <= pred_target_in;
         end else begin
             // Pipe stalled — s2 holds. s1 can still accept if empty.
             if (!s1_valid) begin
-                s1_valid    <= valid_in;
-                s1_opcode   <= opcode_in;
-                s1_src1     <= src1_in;
-                s1_src2     <= src2_in;
-                s1_dest_tag <= dest_tag_in;
-                s1_rob_idx  <= rob_idx_in;
-                s1_imm      <= imm_in;
-                s1_pc       <= pc_in;
-                s1_br_pred  <= br_pred_taken_in;
+                s1_valid       <= valid_in;
+                s1_opcode      <= opcode_in;
+                s1_src1        <= src1_in;
+                s1_src2        <= src2_in;
+                s1_dest_tag    <= dest_tag_in;
+                s1_rob_idx     <= rob_idx_in;
+                s1_imm         <= imm_in;
+                s1_pc          <= pc_in;
+                s1_br_pred     <= br_pred_taken_in;
+                s1_pred_target <= pred_target_in;
             end
         end
     end
@@ -225,7 +231,11 @@ module alu_pipe (
     assign is_branch_out     = s2_is_branch;
     assign branch_taken_out  = s2_branch_taken;
     assign branch_target_out = s2_branch_target;
+
+    // Mispredict: taken/not-taken mismatch OR target mismatch on predicted-taken
     assign mispredict_out    = s2_valid && s2_is_branch &&
-                               (s2_branch_taken != s2_br_pred);
+                               ((s2_branch_taken != s2_br_pred) ||
+                                (s2_br_pred && s2_branch_taken &&
+                                 s2_branch_target != s2_pred_target));
 
 endmodule

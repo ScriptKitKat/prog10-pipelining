@@ -12,11 +12,13 @@ module decode_rename (
     input  [31:0] in0_inst,
     input  [63:0] in0_pc,
     input         in0_br_pred,
+    input  [63:0] in0_pred_target,
     input         in0_valid,
 
     input  [31:0] in1_inst,
     input  [63:0] in1_pc,
     input         in1_br_pred,
+    input  [63:0] in1_pred_target,
     input         in1_valid,
 
     // --- Resource status (combinational inputs) ---
@@ -126,6 +128,7 @@ module decode_rename (
     output reg [63:0] rs_alu_dispatch_imm_a,
     output reg [63:0] rs_alu_dispatch_pc_a,
     output reg        rs_alu_dispatch_br_pred_a,
+    output reg [63:0] rs_alu_dispatch_pred_target_a,
 
     // ALU RS dispatch (slot B)
     output reg       rs_alu_dispatch_en_b,
@@ -141,6 +144,7 @@ module decode_rename (
     output reg [63:0] rs_alu_dispatch_imm_b,
     output reg [63:0] rs_alu_dispatch_pc_b,
     output reg        rs_alu_dispatch_br_pred_b,
+    output reg [63:0] rs_alu_dispatch_pred_target_b,
 
     // FPU RS dispatch (slot A)
     output reg       rs_fpu_dispatch_en_a,
@@ -471,6 +475,7 @@ module decode_rename (
         rs_alu_dispatch_src2_val_a = 64'd0; rs_alu_dispatch_src2_tag_a = 7'd0; rs_alu_dispatch_src2_rdy_a = 1'b0;
         rs_alu_dispatch_dest_tag_a = 7'd0; rs_alu_dispatch_rob_idx_a = 5'd0;
         rs_alu_dispatch_imm_a = 64'd0; rs_alu_dispatch_pc_a = 64'd0; rs_alu_dispatch_br_pred_a = 1'b0;
+        rs_alu_dispatch_pred_target_a = 64'd0;
 
         rs_alu_dispatch_en_b = 1'b0;
         rs_alu_dispatch_opcode_b = 5'd0;
@@ -478,6 +483,7 @@ module decode_rename (
         rs_alu_dispatch_src2_val_b = 64'd0; rs_alu_dispatch_src2_tag_b = 7'd0; rs_alu_dispatch_src2_rdy_b = 1'b0;
         rs_alu_dispatch_dest_tag_b = 7'd0; rs_alu_dispatch_rob_idx_b = 5'd0;
         rs_alu_dispatch_imm_b = 64'd0; rs_alu_dispatch_pc_b = 64'd0; rs_alu_dispatch_br_pred_b = 1'b0;
+        rs_alu_dispatch_pred_target_b = 64'd0;
 
         rs_fpu_dispatch_en_a = 1'b0;
         rs_fpu_dispatch_opcode_a = 5'd0;
@@ -543,6 +549,7 @@ module decode_rename (
                     rs_alu_dispatch_imm_a      = imm_a;
                     rs_alu_dispatch_pc_a       = in0_pc;
                     rs_alu_dispatch_br_pred_a  = in0_br_pred;
+                    rs_alu_dispatch_pred_target_a = in0_pred_target;
                 end
                 TYPE_FPU: begin
                     rs_fpu_dispatch_en_a       = 1'b1;
@@ -637,6 +644,7 @@ module decode_rename (
                     rs_alu_dispatch_imm_b      = imm_b;
                     rs_alu_dispatch_pc_b       = in1_pc;
                     rs_alu_dispatch_br_pred_b  = in1_br_pred;
+                    rs_alu_dispatch_pred_target_b = in1_pred_target;
                 end
                 TYPE_FPU: begin
                     rs_fpu_dispatch_en_b      = 1'b1;
