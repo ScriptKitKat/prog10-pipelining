@@ -199,6 +199,159 @@ module fetch_unit_tb;
         check("t3 refill pc", out0_pc, 64'h3000);
 
         // ----------------------------------------------------------
+        // TEST 4: Non-BRR_L branches must NOT use BHT prediction
+        //         (BRNZ opcode 0x0B should always get pred_taken=0)
+        // ----------------------------------------------------------
+        $display("\n--- Test 4: BRNZ ignores BHT (pred=0 always) ---");
+
+        // First, train the BHT entry at PC 0x2000 to '1' (taken)
+        bht_update_en = 1;
+        bht_update_pc = 64'h2000;
+        bht_pred_taken = 0;
+        bht_actual_taken = 1;
+        @(posedge clk); #1;
+        bht_update_en = 0;
+
+        // Place a BRNZ instruction at word 0 of line 0x2000
+        // BRNZ rs=r1, rd=r2 : {5'h0B, 5'd2, 5'd1, 5'd0, 12'd0}
+        line_2000 = line_bytes(
+            {5'h0B, 5'd2, 5'd1, 5'd0, 12'd0},  // BRNZ at 0x2000
+            INS_NOP, INS_NOP, INS_NOP,
+            INS_NOP, INS_NOP, INS_NOP, INS_NOP,
+            INS_NOP, INS_NOP, INS_NOP, INS_NOP,
+            INS_NOP, INS_NOP, INS_NOP, INS_NOP);
+
+        flush = 1; flush_pc = 64'h2000;
+        @(posedge clk); #1;
+        flush = 0;
+        @(posedge clk); #1;
+
+        // BHT entry at PC[9:2]=0 is '1', but BRNZ should NOT use it
+        check1("t4 brnz pred=0", out0_br_pred, 1'b0);
+        // Fetch should continue sequentially (no redirect)
+        decode_take = 2'd1;
+        @(posedge clk); #1;
+        decode_take = 0;
+        check("t4 seq after brnz", out0_pc, 64'h2004);
+
+        // ----------------------------------------------------------
+        // TEST 5: BRGT also ignores BHT
+        // ----------------------------------------------------------
+        $display("\n--- Test 5: BRGT ignores BHT (pred=0 always) ---");
+
+        // Place BRGT at 0x2000: {5'h0E, 5'd3, 5'd1, 5'd2, 12'd0}
+        line_2000 = line_bytes(
+            {5'h0E, 5'd3, 5'd1, 5'd2, 12'd0},  // BRGT at 0x2000
+            INS_NOP, INS_NOP, INS_NOP,
+            INS_NOP, INS_NOP, INS_NOP, INS_NOP,
+            INS_NOP, INS_NOP, INS_NOP, INS_NOP,
+            INS_NOP, INS_NOP, INS_NOP, INS_NOP);
+
+        flush = 1; flush_pc = 64'h2000;
+        @(posedge clk); #1;
+        flush = 0;
+        @(posedge clk); #1;
+
+        check1("t5 brgt pred=0", out0_br_pred, 1'b0);
+
+        // ----------------------------------------------------------
+        // TEST 6: Forward BRR_L learns via BHT after update
+        //         BRR_L +0x10 at PC 0x2008 (L[11]=0 → forward, uses BHT)
+        // ----------------------------------------------------------
+        $display("\n--- Test 6: Forward BRR_L BHT learning ---");
+
+        // Place BRR_L +0x10 at word 2 (PC 0x2008)
+        line_2000 = line_bytes(
+            INS_NOP, INS_NOP,
+            ins_brr_l(12'sh010),  // forward +16 at PC 0x2008
+            INS_NOP,
+            INS_NOP, INS_NOP, INS_NOP, INS_NOP,
+            INS_NOP, INS_NOP, INS_NOP, INS_NOP,
+            INS_NOP, INS_NOP, INS_NOP, INS_NOP);
+
+        flush = 1; flush_pc = 64'h2000;
+        @(posedge clk); #1;
+        flush = 0;
+        @(posedge clk); #1;
+
+        // Consume the first 2 NOPs to get to the BRR_L at 0x2008
+        decode_take = 2'd2;
+        @(posedge clk); #1;
+        decode_take = 0;
+        #1;
+
+        // BHT entry at 0x2008[9:2]=2 should be 0 (cold) → predict not-taken
+        check1("t6 fwd brr_l cold pred", out0_br_pred, 1'b0);
+        check("t6 fwd brr_l pc", out0_pc, 64'h2008);
+
+        // Train BHT: update PC 0x2008 with pred=0, actual=1 → flip to 1
+        bht_update_en = 1;
+        bht_update_pc = 64'h2008;
+        bht_pred_taken = 0;
+        bht_actual_taken = 1;
+        @(posedge clk); #1;
+        bht_update_en = 0;
+
+        // Re-fetch from 0x2000 and check prediction at 0x2008
+        flush = 1; flush_pc = 64'h2000;
+        @(posedge clk); #1;
+        flush = 0;
+        @(posedge clk); #1;
+
+        decode_take = 2'd2;
+        @(posedge clk); #1;
+        decode_take = 0;
+        #1;
+
+        // Now BHT[2]=1 → forward BRR_L predicted taken
+        check1("t6 fwd brr_l trained pred", out0_br_pred, 1'b1);
+
+        // After predicted-taken BRR_L, next fetch should be at target 0x2008+0x10=0x2018
+        decode_take = 2'd1;
+        @(posedge clk); #1;
+        decode_take = 0;
+        #1;
+        check("t6 redirect target", out0_pc, 64'h2018);
+
+        // ----------------------------------------------------------
+        // TEST 7: Backward BRR_L always statically predicted taken
+        //         (regardless of BHT state)
+        // ----------------------------------------------------------
+        $display("\n--- Test 7: Backward BRR_L static taken ---");
+
+        // Place backward BRR_L -8 at word 4 (PC 0x2010)
+        // L = -8 = 12'hFF8, L[11]=1 → backward
+        line_2000 = line_bytes(
+            INS_NOP, INS_NOP, INS_NOP, INS_NOP,
+            ins_brr_l(12'hFF8),  // backward -8 at PC 0x2010
+            INS_NOP, INS_NOP, INS_NOP,
+            INS_NOP, INS_NOP, INS_NOP, INS_NOP,
+            INS_NOP, INS_NOP, INS_NOP, INS_NOP);
+
+        flush = 1; flush_pc = 64'h2000;
+        @(posedge clk); #1;
+        flush = 0;
+        @(posedge clk); #1;
+
+        // Consume 4 NOPs to reach backward BRR_L at 0x2010
+        decode_take = 2'd2;
+        @(posedge clk); #1;
+        decode_take = 2'd2;
+        @(posedge clk); #1;
+        decode_take = 0;
+        #1;
+
+        check1("t7 bkwd pred taken", out0_br_pred, 1'b1);
+        check("t7 bkwd brr_l pc", out0_pc, 64'h2010);
+
+        // Next fetch should redirect to 0x2010 + (-8) = 0x2008
+        decode_take = 2'd1;
+        @(posedge clk); #1;
+        decode_take = 0;
+        #1;
+        check("t7 bkwd target", out0_pc, 64'h2008);
+
+        // ----------------------------------------------------------
         // Summary
         // ----------------------------------------------------------
         $display("\n==================================================");

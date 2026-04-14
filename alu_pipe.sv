@@ -156,6 +156,7 @@ module alu_pipe (
     reg        s2_branch_taken;
     reg [63:0] s2_branch_target;
     reg        s2_br_pred;
+    reg [63:0] s2_pc;
 
     // ----------------------------------------------------------------
     // Stall / ready logic
@@ -185,6 +186,7 @@ module alu_pipe (
             s2_branch_taken  <= s1_branch_taken_c;
             s2_branch_target <= s1_branch_target_c;
             s2_br_pred       <= s1_br_pred;
+            s2_pc            <= s1_pc;
 
             // Stage 1 ← input
             s1_valid    <= valid_in;

@@ -691,12 +691,28 @@ module tinker (
     assign fetch_flush    = do_flush;
     assign fetch_flush_pc = mispredict_redirect_pc;
 
-    // BHT update on branch completion via CDB
-    assign bht_update_en   = (cdb_valid_bus0 && (cdb_win0_id == 3'd0 || cdb_win0_id == 3'd1) && cdb_win0_valid &&
-                              ((cdb_win0_id == 3'd0 && alu0_is_br) || (cdb_win0_id == 3'd1 && alu1_is_br)));
-    assign bht_update_pc   = (cdb_win0_id == 3'd0) ? u_alu0.s2_result : u_alu1.s2_result;  // the PC was passed
-    assign bht_pred_taken  = (cdb_win0_id == 3'd0) ? u_alu0.s2_br_pred : u_alu1.s2_br_pred;
-    assign bht_actual_taken = (cdb_win0_id == 3'd0) ? alu0_br_taken : alu1_br_taken;
+    // BHT update on branch completion via CDB (check both buses)
+    wire bht_bus0_is_br = cdb_valid_bus0 && cdb_win0_valid &&
+                          ((cdb_win0_id == 3'd0 && alu0_is_br) ||
+                           (cdb_win0_id == 3'd1 && alu1_is_br));
+    wire bht_bus1_is_br = cdb_valid_bus1 && cdb_win1_valid &&
+                          ((cdb_win1_id == 3'd0 && alu0_is_br) ||
+                           (cdb_win1_id == 3'd1 && alu1_is_br));
+
+    assign bht_update_en = bht_bus0_is_br || bht_bus1_is_br;
+
+    // Use branch instruction PC (s2_pc), not result (s2_result was redirect target — wrong!)
+    assign bht_update_pc = bht_bus0_is_br ?
+                           ((cdb_win0_id == 3'd0) ? u_alu0.s2_pc : u_alu1.s2_pc) :
+                           ((cdb_win1_id == 3'd0) ? u_alu0.s2_pc : u_alu1.s2_pc);
+
+    assign bht_pred_taken = bht_bus0_is_br ?
+                            ((cdb_win0_id == 3'd0) ? u_alu0.s2_br_pred : u_alu1.s2_br_pred) :
+                            ((cdb_win1_id == 3'd0) ? u_alu0.s2_br_pred : u_alu1.s2_br_pred);
+
+    assign bht_actual_taken = bht_bus0_is_br ?
+                              ((cdb_win0_id == 3'd0) ? alu0_br_taken : alu1_br_taken) :
+                              ((cdb_win1_id == 3'd0) ? alu0_br_taken : alu1_br_taken);
 
     // ================================================================
     // ROB Commit → Architectural Register File + Free List + Memory

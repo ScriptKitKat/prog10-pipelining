@@ -143,12 +143,17 @@ module fetch_unit (
                             // BRR_L: 12-bit signed L — backward branches (L[11]==1) are almost always
                             // loop edges; cold 1-bit BHT starts at NT and destroys loop performance.
                             // Static bias: predict taken on backward BRR_L; otherwise use BHT.
+                            // Only predict BRR_L — it is the sole branch type whose
+                            // target is computable at fetch time (PC-relative immediate).
+                            // Predicting taken for register-indirect branches (BRNZ,
+                            // BRGT, BR, BRR, CALL, RETURN) without redirecting fetch
+                            // would allow wrong-path instructions to commit.
                             pred_taken = 1'b0;
-                            if (is_br) begin
-                                if (opc == OPC_BRR_L && insn_w[11])
-                                    pred_taken = 1'b1;
+                            if (opc == OPC_BRR_L) begin
+                                if (insn_w[11])
+                                    pred_taken = 1'b1;      // static: backward = taken
                                 else
-                                    pred_taken = bht_bits[insn_pc[9:2]];
+                                    pred_taken = bht_bits[insn_pc[9:2]]; // BHT for forward
                             end
 
                             q_inst[wp] = insn_w;
