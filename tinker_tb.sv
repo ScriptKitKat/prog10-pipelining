@@ -9,7 +9,7 @@ module tinker_tb;
     reg clk, reset;
     wire hlt;
 
-    tinker_core dut(.clk(clk), .reset(reset), .hlt(hlt));
+    tinker dut(.clk(clk), .reset(reset), .hlt(hlt));
 
     always #5 clk = ~clk;
 
@@ -21,10 +21,10 @@ module tinker_tb;
 
     task store_instr(input [63:0] addr, input [31:0] word);
         begin
-            dut.memory.bytes[addr + 0] = word[7:0];
-            dut.memory.bytes[addr + 1] = word[15:8];
-            dut.memory.bytes[addr + 2] = word[23:16];
-            dut.memory.bytes[addr + 3] = word[31:24];
+            dut.u_mem.bytes[addr + 0] = word[7:0];
+            dut.u_mem.bytes[addr + 1] = word[15:8];
+            dut.u_mem.bytes[addr + 2] = word[23:16];
+            dut.u_mem.bytes[addr + 3] = word[31:24];
         end
     endtask
 
@@ -43,12 +43,13 @@ module tinker_tb;
 
         #8 reset = 0;
 
-        // Run long enough for FETCH/DECODE/EXECUTE/WB across 3 instrs
-        repeat (60) @(posedge clk);
+        // Pipelined `tinker` may need a full integration testbench (task 11) to match this smoke;
+        // the legacy multicycle reference is `tinker_multicycle.sv`.
+        repeat (5000) @(posedge clk);
 
-        $display("r1 = %0d (expect 8)", dut.reg_file.registers[1]);
+        $display("r1 = %0d (expect 8)", dut.u_arch_rf.registers[1]);
         $display("hlt = %b (expect 1)", hlt);
-        if (dut.reg_file.registers[1] === 64'd8 && hlt === 1'b1)
+        if (dut.u_arch_rf.registers[1] === 64'd8 && hlt === 1'b1)
             $display("PASS tinker smoke test");
         else
             $display("FAIL tinker smoke test");

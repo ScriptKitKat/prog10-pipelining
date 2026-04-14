@@ -1,3 +1,6 @@
+`ifndef ALU_SV_INCLUDED
+`define ALU_SV_INCLUDED
+
 `include "fpu.sv"
 
 module ALU(
@@ -122,3 +125,5 @@ module ALU(
         endcase
     end
 endmodule
+
+`endif // ALU_SV_INCLUDED

@@ -1,3 +1,6 @@
+`ifndef MEMORY_REG_SV_INCLUDED
+`define MEMORY_REG_SV_INCLUDED
+
 `define MEM_SIZE (1024*512)
 `define START 64'h2000
 
@@ -6,6 +9,9 @@ module memory(
     input reset,
     input [63:0] PC,
     output [31:0] instruction,
+    // 64-byte instruction fetch port (16 x 32-bit instructions)
+    input [63:0] instr_fetch_addr,
+    output [511:0] instr_fetch_data,
     input [63:0] data_address,
     output [63:0] data_out,
     output data_ready,
@@ -16,6 +22,19 @@ module memory(
     reg [7:0] bytes [0:`MEM_SIZE-1];
 
     assign instruction = {bytes[PC + 3], bytes[PC + 2], bytes[PC + 1], bytes[PC]};
+
+    // 64-byte fetch: 16 consecutive 32-bit instructions (little-endian)
+    genvar gi;
+    generate
+        for (gi = 0; gi < 16; gi = gi + 1) begin : fetch_gen
+            assign instr_fetch_data[gi*32 +: 32] = {
+                bytes[instr_fetch_addr + gi*4 + 3],
+                bytes[instr_fetch_addr + gi*4 + 2],
+                bytes[instr_fetch_addr + gi*4 + 1],
+                bytes[instr_fetch_addr + gi*4]
+            };
+        end
+    endgenerate
 
     assign data_out = {bytes[data_address + 7], bytes[data_address + 6],
                        bytes[data_address + 5], bytes[data_address + 4],
@@ -44,12 +63,17 @@ module reg_file(
     input write_enable,
     input [63:0] write_data,
     input [4:0] write_select,
+    input write_enable2,
+    input [63:0] write_data2,
+    input [4:0] write_select2,
     input [4:0] read_sel1,
     input [4:0] read_sel2,
     input [4:0] read_sel3,
+    input [4:0] read_sel4,
     output [63:0] read_data1,
     output [63:0] read_data2,
     output [63:0] read_data3,
+    output [63:0] read_data4,
     output [63:0] read_r31
 );
     reg [63:0] registers [0:31];
@@ -57,6 +81,7 @@ module reg_file(
     assign read_data1 = registers[read_sel1];
     assign read_data2 = registers[read_sel2];
     assign read_data3 = registers[read_sel3];
+    assign read_data4 = registers[read_sel4];
     assign read_r31 = registers[31];
 
     integer i;
@@ -66,8 +91,15 @@ module reg_file(
                 registers[i] <= 64'b0;
             end
             registers[31] <= `MEM_SIZE;
-        end else if (write_enable) begin
-            registers[write_select] <= write_data;
+        end else begin
+            // Port 1 write
+            if (write_enable)
+                registers[write_select] <= write_data;
+            // Port 2 write (wins on conflict with port 1)
+            if (write_enable2)
+                registers[write_select2] <= write_data2;
         end
     end
 endmodule
+
+`endif // MEMORY_REG_SV_INCLUDED

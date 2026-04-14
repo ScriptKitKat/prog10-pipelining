@@ -1,3 +1,6 @@
+`ifndef FPU_SV_INCLUDED
+`define FPU_SV_INCLUDED
+
 module fpu_class(input [63:0] f, output nan, output infinity, output zero, output subnormal, output normal);
     wire expOnes = &f[62:52];
     wire expZero = ~|f[62:52];
@@ -432,3 +435,5 @@ module fpu_div(input [63:0] a, input [63:0] b, output reg [63:0] result);
         end
     end
 endmodule
+
+`endif // FPU_SV_INCLUDED
