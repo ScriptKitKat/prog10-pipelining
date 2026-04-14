@@ -140,9 +140,16 @@ module fetch_unit (
                             opc     = insn_w[31:27];
                             is_br   = is_branch_opcode(opc);
 
+                            // BRR_L: 12-bit signed L — backward branches (L[11]==1) are almost always
+                            // loop edges; cold 1-bit BHT starts at NT and destroys loop performance.
+                            // Static bias: predict taken on backward BRR_L; otherwise use BHT.
                             pred_taken = 1'b0;
-                            if (is_br)
-                                pred_taken = bht_bits[insn_pc[9:2]];
+                            if (is_br) begin
+                                if (opc == OPC_BRR_L && insn_w[11])
+                                    pred_taken = 1'b1;
+                                else
+                                    pred_taken = bht_bits[insn_pc[9:2]];
+                            end
 
                             q_inst[wp] = insn_w;
                             q_pc[wp]   = insn_pc;
