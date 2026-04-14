@@ -224,34 +224,82 @@ module reservation_station #(
             if (dispatch_en0 && has_free0) begin
                 entry_valid[free_slot0]    <= 1'b1;
                 entry_opcode[free_slot0]   <= dispatch_opcode0;
-                entry_src1_val[free_slot0] <= dispatch_src1_value0;
                 entry_src1_tag[free_slot0] <= dispatch_src1_tag0;
-                entry_src1_rdy[free_slot0] <= dispatch_src1_ready0;
-                entry_src2_val[free_slot0] <= dispatch_src2_value0;
                 entry_src2_tag[free_slot0] <= dispatch_src2_tag0;
-                entry_src2_rdy[free_slot0] <= dispatch_src2_ready0;
                 entry_dest_tag[free_slot0] <= dispatch_dest_tag0;
                 entry_rob_idx[free_slot0]  <= dispatch_rob_idx0;
                 entry_imm[free_slot0]      <= dispatch_imm0;
                 entry_pc[free_slot0]       <= dispatch_pc0;
                 entry_br_pred[free_slot0]  <= dispatch_br_pred0;
                 entry_pred_tgt[free_slot0] <= dispatch_pred_target0;
+                // src1 with CDB bypass
+                if (dispatch_src1_ready0) begin
+                    entry_src1_rdy[free_slot0] <= 1'b1;
+                    entry_src1_val[free_slot0] <= dispatch_src1_value0;
+                end else if (cdb_valid0 && dispatch_src1_tag0 == cdb_tag0) begin
+                    entry_src1_rdy[free_slot0] <= 1'b1;
+                    entry_src1_val[free_slot0] <= cdb_value0;
+                end else if (cdb_valid1 && dispatch_src1_tag0 == cdb_tag1) begin
+                    entry_src1_rdy[free_slot0] <= 1'b1;
+                    entry_src1_val[free_slot0] <= cdb_value1;
+                end else begin
+                    entry_src1_rdy[free_slot0] <= 1'b0;
+                    entry_src1_val[free_slot0] <= dispatch_src1_value0;
+                end
+                // src2 with CDB bypass
+                if (dispatch_src2_ready0) begin
+                    entry_src2_rdy[free_slot0] <= 1'b1;
+                    entry_src2_val[free_slot0] <= dispatch_src2_value0;
+                end else if (cdb_valid0 && dispatch_src2_tag0 == cdb_tag0) begin
+                    entry_src2_rdy[free_slot0] <= 1'b1;
+                    entry_src2_val[free_slot0] <= cdb_value0;
+                end else if (cdb_valid1 && dispatch_src2_tag0 == cdb_tag1) begin
+                    entry_src2_rdy[free_slot0] <= 1'b1;
+                    entry_src2_val[free_slot0] <= cdb_value1;
+                end else begin
+                    entry_src2_rdy[free_slot0] <= 1'b0;
+                    entry_src2_val[free_slot0] <= dispatch_src2_value0;
+                end
             end
             if (dispatch_en1 && has_free1) begin
                 entry_valid[free_slot1]    <= 1'b1;
                 entry_opcode[free_slot1]   <= dispatch_opcode1;
-                entry_src1_val[free_slot1] <= dispatch_src1_value1;
                 entry_src1_tag[free_slot1] <= dispatch_src1_tag1;
-                entry_src1_rdy[free_slot1] <= dispatch_src1_ready1;
-                entry_src2_val[free_slot1] <= dispatch_src2_value1;
                 entry_src2_tag[free_slot1] <= dispatch_src2_tag1;
-                entry_src2_rdy[free_slot1] <= dispatch_src2_ready1;
                 entry_dest_tag[free_slot1] <= dispatch_dest_tag1;
                 entry_rob_idx[free_slot1]  <= dispatch_rob_idx1;
                 entry_imm[free_slot1]      <= dispatch_imm1;
                 entry_pc[free_slot1]       <= dispatch_pc1;
                 entry_br_pred[free_slot1]  <= dispatch_br_pred1;
                 entry_pred_tgt[free_slot1] <= dispatch_pred_target1;
+                // src1 with CDB bypass
+                if (dispatch_src1_ready1) begin
+                    entry_src1_rdy[free_slot1] <= 1'b1;
+                    entry_src1_val[free_slot1] <= dispatch_src1_value1;
+                end else if (cdb_valid0 && dispatch_src1_tag1 == cdb_tag0) begin
+                    entry_src1_rdy[free_slot1] <= 1'b1;
+                    entry_src1_val[free_slot1] <= cdb_value0;
+                end else if (cdb_valid1 && dispatch_src1_tag1 == cdb_tag1) begin
+                    entry_src1_rdy[free_slot1] <= 1'b1;
+                    entry_src1_val[free_slot1] <= cdb_value1;
+                end else begin
+                    entry_src1_rdy[free_slot1] <= 1'b0;
+                    entry_src1_val[free_slot1] <= dispatch_src1_value1;
+                end
+                // src2 with CDB bypass
+                if (dispatch_src2_ready1) begin
+                    entry_src2_rdy[free_slot1] <= 1'b1;
+                    entry_src2_val[free_slot1] <= dispatch_src2_value1;
+                end else if (cdb_valid0 && dispatch_src2_tag1 == cdb_tag0) begin
+                    entry_src2_rdy[free_slot1] <= 1'b1;
+                    entry_src2_val[free_slot1] <= cdb_value0;
+                end else if (cdb_valid1 && dispatch_src2_tag1 == cdb_tag1) begin
+                    entry_src2_rdy[free_slot1] <= 1'b1;
+                    entry_src2_val[free_slot1] <= cdb_value1;
+                end else begin
+                    entry_src2_rdy[free_slot1] <= 1'b0;
+                    entry_src2_val[free_slot1] <= dispatch_src2_value1;
+                end
             end
 
             // ---- CDB snoop ----
