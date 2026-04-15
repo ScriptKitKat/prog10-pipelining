@@ -16,23 +16,23 @@ module tinker_tb;
 
     task store_instr(input [63:0] addr, input [31:0] word);
         begin
-            dut.u_mem.bytes[addr + 0] = word[7:0];
-            dut.u_mem.bytes[addr + 1] = word[15:8];
-            dut.u_mem.bytes[addr + 2] = word[23:16];
-            dut.u_mem.bytes[addr + 3] = word[31:24];
+            dut.memory.bytes[addr + 0] = word[7:0];
+            dut.memory.bytes[addr + 1] = word[15:8];
+            dut.memory.bytes[addr + 2] = word[23:16];
+            dut.memory.bytes[addr + 3] = word[31:24];
         end
     endtask
 
     task store_dword(input [63:0] addr, input [63:0] data);
         begin
-            dut.u_mem.bytes[addr + 0] = data[7:0];
-            dut.u_mem.bytes[addr + 1] = data[15:8];
-            dut.u_mem.bytes[addr + 2] = data[23:16];
-            dut.u_mem.bytes[addr + 3] = data[31:24];
-            dut.u_mem.bytes[addr + 4] = data[39:32];
-            dut.u_mem.bytes[addr + 5] = data[47:40];
-            dut.u_mem.bytes[addr + 6] = data[55:48];
-            dut.u_mem.bytes[addr + 7] = data[63:56];
+            dut.memory.bytes[addr + 0] = data[7:0];
+            dut.memory.bytes[addr + 1] = data[15:8];
+            dut.memory.bytes[addr + 2] = data[23:16];
+            dut.memory.bytes[addr + 3] = data[31:24];
+            dut.memory.bytes[addr + 4] = data[39:32];
+            dut.memory.bytes[addr + 5] = data[47:40];
+            dut.memory.bytes[addr + 6] = data[55:48];
+            dut.memory.bytes[addr + 7] = data[63:56];
         end
     endtask
 
@@ -58,7 +58,7 @@ module tinker_tb;
             #2;
             // Clear instruction memory area
             for (i = 0; i < 128; i = i + 1)
-                dut.u_mem.bytes[64'h2000 + i] = 8'd0;
+                dut.memory.bytes[64'h2000 + i] = 8'd0;
         end
     endtask
 
@@ -76,7 +76,7 @@ module tinker_tb;
     task check_reg(input [4:0] regnum, input [63:0] expected, input [8*40:1] test_name);
         reg [63:0] actual;
         begin
-            actual = dut.u_arch_rf.registers[regnum];
+            actual = dut.reg_file.registers[regnum];
             if (actual === expected) begin
                 $display("  PASS: r%0d = %0d", regnum, actual);
                 pass_count = pass_count + 1;

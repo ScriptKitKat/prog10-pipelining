@@ -27,7 +27,7 @@ module lsq_tb;
     wire [511:0] mem_fetch_data;
     wire mem_data_ready;
 
-    memory u_mem (
+    memory memory (
         .clk            (clk),
         .reset          (reset),
         .PC             (64'h2000),

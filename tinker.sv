@@ -37,7 +37,7 @@ module tinker_core(
     wire [63:0]  mem_write_addr;
     wire [63:0]  mem_write_data;
 
-    memory u_mem (
+    memory memory (
         .clk(clk), .reset(reset),
         .PC(64'd0), .instruction(),
         .instr_fetch_addr(mem_instr_fetch_addr),
@@ -57,7 +57,7 @@ module tinker_core(
     wire [4:0]  arch_wsel0, arch_wsel1;
     wire [63:0] arch_wdata0, arch_wdata1;
 
-    reg_file u_arch_rf (
+    reg_file reg_file (
         .clk(clk), .reset(reset),
         .write_enable(arch_we0),   .write_data(arch_wdata0), .write_select(arch_wsel0),
         .write_enable2(arch_we1),  .write_data2(arch_wdata1), .write_select2(arch_wsel1),
