@@ -186,7 +186,7 @@ module lsq_tb;
     // Test sequence
     // ================================================================
     initial begin
-        $dumpfile("lsq_tb.vcd");
+        $dumpfile("sim/lsq_tb.vcd");
         $dumpvars(0, lsq_tb);
 
         // --- Reset ---

@@ -51,7 +51,7 @@ module memory_reg_tb;
     endtask
 
     initial begin
-        $dumpfile("memory_reg_tb.vcd");
+        $dumpfile("sim/memory_reg_tb.vcd");
         $dumpvars(0, memory_reg_tb);
 
         clk = 0; reset = 1;

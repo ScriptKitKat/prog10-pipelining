@@ -87,7 +87,7 @@ module rs_tb;
     endtask
 
     initial begin
-        $dumpfile("rs_tb.vcd");
+        $dumpfile("sim/rs_tb.vcd");
         $dumpvars(0, rs_tb);
 
         clk = 0; reset = 1;

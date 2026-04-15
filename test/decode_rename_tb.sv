@@ -5,6 +5,11 @@
 
 `timescale 1ns/1ps
 
+`include "phys_reg_file.sv"
+`include "free_list.sv"
+`include "rat.sv"
+`include "decode_rename.sv"
+
 module decode_rename_tb;
 
     reg clk, reset;
@@ -258,7 +263,7 @@ module decode_rename_tb;
     // Test sequences
     // ================================================================
     initial begin
-        $dumpfile("decode_rename_tb.vcd");
+        $dumpfile("sim/decode_rename_tb.vcd");
         $dumpvars(0, decode_rename_tb);
 
         clk = 0; reset = 1;

@@ -138,7 +138,7 @@ module eu_tb;
     // Tests
     // ================================================================
     initial begin
-        $dumpfile("eu_tb.vcd");
+        $dumpfile("sim/eu_tb.vcd");
         $dumpvars(0, eu_tb);
 
         // Reset

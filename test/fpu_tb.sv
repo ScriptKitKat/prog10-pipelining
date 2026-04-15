@@ -11,7 +11,7 @@ module fpu_tb;
     fpu_div u_div(.a(a), .b(b),     .result(div_r));
 
     initial begin
-        $dumpfile("fpu_tb.vcd");
+        $dumpfile("sim/fpu_tb.vcd");
         $dumpvars(0, fpu_tb);
 
         // 1.0 + 2.0 = 3.0

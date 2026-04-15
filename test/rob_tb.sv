@@ -113,7 +113,7 @@ module rob_tb;
     endtask
 
     initial begin
-        $dumpfile("rob_tb.vcd");
+        $dumpfile("sim/rob_tb.vcd");
         $dumpvars(0, rob_tb);
 
         clk = 0; reset = 1;

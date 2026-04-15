@@ -99,7 +99,7 @@ module fetch_unit_tb;
     endtask
 
     initial begin
-        $dumpfile("fetch_unit_tb.vcd");
+        $dumpfile("sim/fetch_unit_tb.vcd");
         $dumpvars(0, fetch_unit_tb);
 
         line_2000 = line_bytes(

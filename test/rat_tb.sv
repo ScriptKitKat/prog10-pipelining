@@ -78,7 +78,7 @@ module rat_tb;
     endtask
 
     initial begin
-        $dumpfile("rat_tb.vcd");
+        $dumpfile("sim/rat_tb.vcd");
         $dumpvars(0, rat_tb);
 
         clk = 0; reset = 1;

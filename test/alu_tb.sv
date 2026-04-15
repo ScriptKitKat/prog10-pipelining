@@ -25,7 +25,7 @@ module alu_tb;
     endtask
 
     initial begin
-        $dumpfile("alu_tb.vcd");
+        $dumpfile("sim/alu_tb.vcd");
         $dumpvars(0, alu_tb);
 
         PC = 64'h2000; r31_data = 64'd0; rd_data = 64'd0; L_data = 12'd0;

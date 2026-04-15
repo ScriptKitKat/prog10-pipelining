@@ -78,7 +78,7 @@ module cdb_tb;
     localparam T_LSQ1 = 7'd31;
 
     initial begin
-        $dumpfile("cdb_tb.vcd");
+        $dumpfile("sim/cdb_tb.vcd");
         $dumpvars(0, cdb_tb);
 
         reset = 1;

@@ -288,7 +288,7 @@ module tinker_tb;
     // Main test driver
     // ================================================================
     initial begin
-        $dumpfile("tinker_tb.vcd");
+        $dumpfile("sim/tinker_tb.vcd");
         $dumpvars(0, tinker_tb);
 
         clk = 0; reset = 1;
