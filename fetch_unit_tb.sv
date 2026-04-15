@@ -33,12 +33,11 @@ module fetch_unit_tb;
     reg [63:0] btb_update_pc, btb_update_target;
     reg        btb_update_taken;
 
-    function automatic [511:0] line_bytes(
-        input [31:0] w0, w1, w2, w3,
-        input [31:0] w4, w5, w6, w7,
-        input [31:0] w8, w9, wa, wb,
-        input [31:0] wc, wd, we, wf
-    );
+    function [511:0] line_bytes;
+        input [31:0] w0, w1, w2, w3;
+        input [31:0] w4, w5, w6, w7;
+        input [31:0] w8, w9, wa, wb;
+        input [31:0] wc, wd, we, wf;
         begin
             line_bytes = {wf, we, wd, wc, wb, wa, w9, w8,
                           w7, w6, w5, w4, w3, w2, w1, w0};

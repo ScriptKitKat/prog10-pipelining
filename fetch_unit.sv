@@ -48,7 +48,8 @@ module fetch_unit (
     localparam OPC_CALL   = 5'h0C;
     localparam OPC_RETURN = 5'h0D;
 
-    function automatic is_branch_opcode(input [4:0] op);
+    function is_branch_opcode;
+        input [4:0] op;
         begin
             is_branch_opcode = (op == 5'h08) || (op == 5'h09) || (op == 5'h0a) ||
                                (op == 5'h0b) || (op == 5'h0c) || (op == 5'h0d) ||
@@ -57,14 +58,16 @@ module fetch_unit (
     endfunction
 
     // Unconditional: BR, BRR, CALL, RETURN — always taken
-    function automatic is_unconditional(input [4:0] op);
+    function is_unconditional;
+        input [4:0] op;
         begin
             is_unconditional = (op == OPC_BR) || (op == OPC_BRR) ||
                                (op == OPC_CALL) || (op == OPC_RETURN);
         end
     endfunction
 
-    function automatic [3:0] inc_ptr(input [3:0] x);
+    function [3:0] inc_ptr;
+        input [3:0] x;
         begin
             inc_ptr = (x == 4'd15) ? 4'd0 : (x + 4'd1);
         end

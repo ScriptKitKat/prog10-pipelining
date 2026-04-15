@@ -114,8 +114,12 @@ module decode_rename_tb;
     // ----------------------------------------------------------------
     // Instruction encoding helper
     // ----------------------------------------------------------------
-    function automatic [31:0] enc(input [4:0] op, input [4:0] rd, input [4:0] rs, input [4:0] rt, input [11:0] L);
-        enc = {op, rd, rs, rt, L};
+    function [31:0] enc;
+        input [4:0] op, rd, rs, rt;
+        input [11:0] L;
+        begin
+            enc = {op, rd, rs, rt, L};
+        end
     endfunction
 
     // ----------------------------------------------------------------

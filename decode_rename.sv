@@ -228,7 +228,9 @@ module decode_rename (
     wire [11:0] L_b   = in1_inst[11:0];
 
     // Classify type
-    function automatic [2:0] classify(input [4:0] op, input [11:0] L_field);
+    function [2:0] classify;
+        input [4:0] op;
+        input [11:0] L_field;
         begin
             case (op)
                 // Integer ALU
@@ -252,7 +254,8 @@ module decode_rename (
     endfunction
 
     // Has destination register (writes rd)?
-    function automatic has_dest(input [4:0] op);
+    function has_dest;
+        input [4:0] op;
         begin
             case (op)
                 5'h18, 5'h19, 5'h1a, 5'h1b, 5'h1c, 5'h1d, // ALU arith
@@ -271,7 +274,10 @@ module decode_rename (
     //   Most: rs.  Reg-imm (ADDI/SUBI/SHFTRI/SHFTLI): rd.  MOVI: rd.
     //   BRNZ: rs (condition).  BRGT: rs.  BR/BRR/CALL: rd.
     //   LOAD: rs (base).  STORE: rd (base addr).
-    function automatic [4:0] src1_arch(input [4:0] op, input [4:0] rd_f, input [4:0] rs_f);
+    function [4:0] src1_arch;
+        input [4:0] op;
+        input [4:0] rd_f;
+        input [4:0] rs_f;
         begin
             case (op)
                 5'h19, 5'h1b, 5'h05, 5'h07: src1_arch = rd_f; // ADDI/SUBI/SHFTRI/SHFTLI
@@ -287,7 +293,11 @@ module decode_rename (
     //   Reg-reg ALU: rt.  BRNZ: rd (target).  BRGT: rt.
     //   STORE: rs (data).
     //   Others needing only 1 source or imm: r0 (unused).
-    function automatic [4:0] src2_arch(input [4:0] op, input [4:0] rd_f, input [4:0] rs_f, input [4:0] rt_f);
+    function [4:0] src2_arch;
+        input [4:0] op;
+        input [4:0] rd_f;
+        input [4:0] rs_f;
+        input [4:0] rt_f;
         begin
             case (op)
                 5'h18, 5'h1a, 5'h1c, 5'h1d,   // reg-reg arith
@@ -304,7 +314,8 @@ module decode_rename (
     endfunction
 
     // Needs src2 at all?
-    function automatic needs_src2(input [4:0] op);
+    function needs_src2;
+        input [4:0] op;
         begin
             case (op)
                 5'h18, 5'h1a, 5'h1c, 5'h1d,

@@ -22,11 +22,17 @@ module fpu_mul(input [63:0] a, input [63:0] b, output reg [63:0] result);
 
     function [5:0] count_leading_zeros(input [52:0] sig);
         integer i;
-        begin : clz_loop
+        reg found;
+        begin
             count_leading_zeros = 0;
+            found = 0;
             for (i = 52; i >= 0; i = i - 1) begin
-                if (sig[i]) disable clz_loop;
-                else count_leading_zeros = count_leading_zeros + 1;
+                if (!found) begin
+                    if (sig[i])
+                        found = 1;
+                    else
+                        count_leading_zeros = count_leading_zeros + 1;
+                end
             end
         end
     endfunction
@@ -131,11 +137,17 @@ module fpu_add(input [63:0] a, input [63:0] b, output reg [63:0] result);
 
     function [5:0] count_leading_zeros(input [55:0] sig);
         integer i;
-        begin : clz_loop
+        reg found;
+        begin
             count_leading_zeros = 0;
+            found = 0;
             for (i = 55; i >= 0; i = i - 1) begin
-                if (sig[i]) disable clz_loop;
-                else count_leading_zeros = count_leading_zeros + 1;
+                if (!found) begin
+                    if (sig[i])
+                        found = 1;
+                    else
+                        count_leading_zeros = count_leading_zeros + 1;
+                end
             end
         end
     endfunction
@@ -312,11 +324,17 @@ module fpu_div(input [63:0] a, input [63:0] b, output reg [63:0] result);
 
     function [5:0] count_leading_zeros(input [52:0] sig);
         integer i;
-        begin : clz_loop
+        reg found;
+        begin
             count_leading_zeros = 0;
+            found = 0;
             for (i = 52; i >= 0; i = i - 1) begin
-                if (sig[i]) disable clz_loop;
-                else count_leading_zeros = count_leading_zeros + 1;
+                if (!found) begin
+                    if (sig[i])
+                        found = 1;
+                    else
+                        count_leading_zeros = count_leading_zeros + 1;
+                end
             end
         end
     endfunction
