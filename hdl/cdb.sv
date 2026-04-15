@@ -1,3 +1,6 @@
+`ifndef CDB_SV_INCLUDED
+`define CDB_SV_INCLUDED
+
 // Common Data Bus — 2 broadcast buses with round-robin arbitration across 6 sources.
 //
 // Sources (fixed order for arbitration index 0..5):
@@ -221,3 +224,5 @@ module cdb (
     end
 
 endmodule
+
+`endif // CDB_SV_INCLUDED

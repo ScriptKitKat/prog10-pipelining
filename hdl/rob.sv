@@ -1,3 +1,6 @@
+`ifndef ROB_SV_INCLUDED
+`define ROB_SV_INCLUDED
+
 // Reorder Buffer (ROB) — 32-entry circular buffer for in-order commit.
 // Supports dual allocate, dual complete (CDB), dual commit, and flush with
 // multi-cycle drain of freed physical registers back to the free list.
@@ -314,3 +317,5 @@ module rob (
     end
 
 endmodule
+
+`endif // ROB_SV_INCLUDED

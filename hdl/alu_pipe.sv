@@ -1,3 +1,6 @@
+`ifndef ALU_PIPE_SV_INCLUDED
+`define ALU_PIPE_SV_INCLUDED
+
 // ALU Execution Pipeline — 2-stage wrapper for integer/logic/branch operations.
 //
 // Stage 1: Latch inputs from RS, compute result combinationally.
@@ -239,3 +242,5 @@ module alu_pipe (
                                  s2_branch_target != s2_pred_target));
 
 endmodule
+
+`endif // ALU_PIPE_SV_INCLUDED

@@ -1,3 +1,6 @@
+`ifndef FETCH_UNIT_SV_INCLUDED
+`define FETCH_UNIT_SV_INCLUDED
+
 // Fetch unit: PC, 16-entry instruction FIFO, 64-byte line fetch,
 // 2-bit saturating BHT (256 entries), 64-entry BTB for register-indirect branches.
 // Unconditional branches (BR, BRR, CALL, RETURN) predicted always-taken when BTB valid.
@@ -279,3 +282,5 @@ module fetch_unit (
     end
 
 endmodule
+
+`endif // FETCH_UNIT_SV_INCLUDED

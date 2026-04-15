@@ -1,3 +1,6 @@
+`ifndef FREE_LIST_SV_INCLUDED
+`define FREE_LIST_SV_INCLUDED
+
 // Free List — circular FIFO of 7-bit physical register indices.
 // Capacity: 96 entries (phys regs 32-127 initially free).
 // Supports alloc (pop) up to 2 per cycle and free (push) up to 2 per cycle.
@@ -69,3 +72,5 @@ module free_list (
     end
 
 endmodule
+
+`endif // FREE_LIST_SV_INCLUDED

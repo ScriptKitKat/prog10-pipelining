@@ -1,3 +1,6 @@
+`ifndef RESERVATION_STATION_SV_INCLUDED
+`define RESERVATION_STATION_SV_INCLUDED
+
 // Reservation Station — parameterized, dual-dispatch, dual-issue.
 // Supports CDB snooping (2 buses), oldest-first issue (by ROB-head distance),
 // grant-based issue acknowledgement, and flush of younger entries.
@@ -391,3 +394,5 @@ module reservation_station #(
     end
 
 endmodule
+
+`endif // RESERVATION_STATION_SV_INCLUDED

@@ -1,3 +1,6 @@
+`ifndef PHYS_REG_FILE_SV_INCLUDED
+`define PHYS_REG_FILE_SV_INCLUDED
+
 // Physical Register File — 128 x 64-bit, 4 read ports (combinational), 2 write ports (posedge clk)
 // Each register has a "ready" bit indicating the value is valid.
 
@@ -78,3 +81,5 @@ module phys_reg_file (
     end
 
 endmodule
+
+`endif // PHYS_REG_FILE_SV_INCLUDED

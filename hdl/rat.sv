@@ -1,3 +1,6 @@
+`ifndef RAT_SV_INCLUDED
+`define RAT_SV_INCLUDED
+
 // Register Alias Table (RAT) — 32 entries mapping architectural reg -> physical reg (7-bit).
 // Supports dual-issue: 4 source lookups + 2 renames per cycle.
 // Handles intra-group forwarding (instruction B reads what instruction A just renamed).
@@ -99,3 +102,5 @@ module rat (
     end
 
 endmodule
+
+`endif // RAT_SV_INCLUDED

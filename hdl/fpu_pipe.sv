@@ -1,3 +1,6 @@
+`ifndef FPU_PIPE_SV_INCLUDED
+`define FPU_PIPE_SV_INCLUDED
+
 // FPU Execution Pipeline — 2-stage wrapper (same depth as alu_pipe).
 //
 // Stage 1: Latch opcode + operands; compute combinational FPU result from regs.
@@ -132,3 +135,5 @@ module fpu_pipe (
     assign result_out   = s2_result;
 
 endmodule
+
+`endif // FPU_PIPE_SV_INCLUDED

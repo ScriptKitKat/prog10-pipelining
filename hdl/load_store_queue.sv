@@ -1,3 +1,6 @@
+`ifndef LOAD_STORE_QUEUE_SV_INCLUDED
+`define LOAD_STORE_QUEUE_SV_INCLUDED
+
 // Load / Store Queue — 8-entry load queue + 8-entry store queue.
 //
 // Load flow:  dispatch → address arrival → forwarding check → memory read → CDB
@@ -477,3 +480,5 @@ module load_store_queue (
     end
 
 endmodule
+
+`endif // LOAD_STORE_QUEUE_SV_INCLUDED

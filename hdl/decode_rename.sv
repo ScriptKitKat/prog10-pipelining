@@ -1,3 +1,6 @@
+`ifndef DECODE_RENAME_SV_INCLUDED
+`define DECODE_RENAME_SV_INCLUDED
+
 // Decode / Rename / Dispatch stage — dual-issue, combinational.
 //
 // Accepts up to 2 instructions from the fetch unit per cycle.
@@ -710,3 +713,5 @@ module decode_rename (
     end
 
 endmodule
+
+`endif // DECODE_RENAME_SV_INCLUDED
