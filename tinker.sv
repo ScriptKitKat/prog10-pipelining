@@ -19,10 +19,10 @@
 `include "fpu_pipe.sv"
 `include "load_store_queue.sv"
 
-module tinker (
-    input         clk,
-    input         reset,
-    output        hlt
+module tinker_core(
+    input clk,
+    input reset,
+    output logic hlt
 );
 
     // ================================================================

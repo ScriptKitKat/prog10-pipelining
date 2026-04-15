@@ -362,8 +362,8 @@ module decode_rename (
             case (type_a)
                 TYPE_ALU, TYPE_BRANCH: if (rs_alu_full) stall_a = 1'b1;
                 TYPE_FPU:              if (rs_fpu_full) stall_a = 1'b1;
-                TYPE_LOAD:             if (lsq_ld_full) stall_a = 1'b1;
-                TYPE_STORE:            if (lsq_st_full) stall_a = 1'b1;
+                TYPE_LOAD:             if (lsq_ld_full || rs_alu_full) stall_a = 1'b1;
+                TYPE_STORE:            if (lsq_st_full || rs_alu_full) stall_a = 1'b1;
                 default: ;
             endcase
         end
@@ -382,8 +382,8 @@ module decode_rename (
             case (type_b)
                 TYPE_ALU, TYPE_BRANCH: if (rs_alu_full)  stall_b = 1'b1;
                 TYPE_FPU:              if (rs_fpu_full)  stall_b = 1'b1;
-                TYPE_LOAD:             if (lsq_ld_full)  stall_b = 1'b1;
-                TYPE_STORE:            if (lsq_st_full)  stall_b = 1'b1;
+                TYPE_LOAD:             if (lsq_ld_full || rs_alu_full)  stall_b = 1'b1;
+                TYPE_STORE:            if (lsq_st_full || rs_alu_full)  stall_b = 1'b1;
                 default: ;
             endcase
             // Same-type conflict: both A and B need same RS/LSQ and only 1 slot

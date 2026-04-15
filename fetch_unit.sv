@@ -1,5 +1,6 @@
 // Fetch unit: PC, 16-entry instruction FIFO, 64-byte line fetch,
-// 1-bit BHT (256 entries), 64-entry BTB for register-indirect branches.
+// 2-bit saturating BHT (256 entries), 64-entry BTB for register-indirect branches.
+// Unconditional branches (BR, BRR, CALL, RETURN) predicted always-taken when BTB valid.
 
 `ifndef TINKER_START_PC
 `define TINKER_START_PC 64'h2000
@@ -41,13 +42,25 @@ module fetch_unit (
     input             btb_update_taken
 );
 
-    localparam OPC_BRR_L = 5'h0A;
+    localparam OPC_BRR_L  = 5'h0A;
+    localparam OPC_BR     = 5'h08;
+    localparam OPC_BRR    = 5'h09;
+    localparam OPC_CALL   = 5'h0C;
+    localparam OPC_RETURN = 5'h0D;
 
     function automatic is_branch_opcode(input [4:0] op);
         begin
             is_branch_opcode = (op == 5'h08) || (op == 5'h09) || (op == 5'h0a) ||
                                (op == 5'h0b) || (op == 5'h0c) || (op == 5'h0d) ||
                                (op == 5'h0e);
+        end
+    endfunction
+
+    // Unconditional: BR, BRR, CALL, RETURN — always taken
+    function automatic is_unconditional(input [4:0] op);
+        begin
+            is_unconditional = (op == OPC_BR) || (op == OPC_BRR) ||
+                               (op == OPC_CALL) || (op == OPC_RETURN);
         end
     endfunction
 
@@ -67,8 +80,11 @@ module fetch_unit (
     reg [3:0] rd_ptr;
     reg [4:0] q_count;
 
-    // 1-bit BHT: 256 entries indexed by PC[9:2]
-    reg [255:0] bht_bits;
+    // 2-bit saturating BHT: 256 entries indexed by PC[9:2]
+    // Encoding: 0=strongly not-taken, 1=weakly not-taken,
+    //           2=weakly taken, 3=strongly taken
+    // Predict taken if bit[1] is set (counter >= 2).
+    reg [1:0] bht_counters [0:255];
 
     // BTB: 64 entries indexed by PC[7:2], direct-mapped
     reg [63:0] btb_valid;
@@ -85,6 +101,7 @@ module fetch_unit (
     reg [31:0] insn_w;
     reg [4:0]  opc;
     reg        is_br;
+    reg        is_uncond;
     reg        pred_taken;
     reg [63:0] pred_target;
     reg [63:0] se_L;
@@ -94,6 +111,8 @@ module fetch_unit (
     reg [3:0]  sw;
     reg [3:0]  rdp1;
     reg [5:0]  btb_idx;
+    reg [7:0]  bht_idx;
+    reg [1:0]  bht_val;
 
     integer ri;
 
@@ -103,7 +122,6 @@ module fetch_unit (
             wr_ptr   <= 4'd0;
             rd_ptr   <= 4'd0;
             q_count  <= 5'd0;
-            bht_bits <= 256'b0;
             btb_valid <= 64'b0;
 
             out0_valid       <= 1'b0;
@@ -117,13 +135,19 @@ module fetch_unit (
             out1_br_pred     <= 1'b0;
             out1_pred_target <= 64'b0;
 
+            for (ri = 0; ri < 256; ri = ri + 1)
+                bht_counters[ri] <= 2'b00;
             for (ri = 0; ri < 64; ri = ri + 1)
                 btb_target[ri] <= 64'd0;
 
         end else begin
-            // BHT update: flip bit on misprediction
-            if (bht_update_en && (bht_pred_taken != bht_actual_taken))
-                bht_bits[bht_update_pc[9:2]] <= ~bht_bits[bht_update_pc[9:2]];
+            // BHT update: saturating increment/decrement
+            if (bht_update_en) begin
+                if (bht_actual_taken && bht_counters[bht_update_pc[9:2]] < 2'd3)
+                    bht_counters[bht_update_pc[9:2]] <= bht_counters[bht_update_pc[9:2]] + 2'd1;
+                else if (!bht_actual_taken && bht_counters[bht_update_pc[9:2]] > 2'd0)
+                    bht_counters[bht_update_pc[9:2]] <= bht_counters[bht_update_pc[9:2]] - 2'd1;
+            end
 
             // BTB update: store target for taken branches
             if (btb_update_en && btb_update_taken) begin
@@ -171,7 +195,10 @@ module fetch_unit (
                             insn_pc = lbase + (w << 2);
                             opc     = insn_w[31:27];
                             is_br   = is_branch_opcode(opc);
+                            is_uncond = is_unconditional(opc);
                             btb_idx = insn_pc[7:2];
+                            bht_idx = insn_pc[9:2];
+                            bht_val = bht_counters[bht_idx];
 
                             pred_taken  = 1'b0;
                             pred_target = insn_pc + 64'd4; // default: fall-through
@@ -185,19 +212,27 @@ module fetch_unit (
                                         pred_taken  = 1'b1;
                                         pred_target = insn_pc + se_L;
                                     end else begin
-                                        // Forward: use BHT
-                                        pred_taken = bht_bits[insn_pc[9:2]];
+                                        // Forward: use 2-bit BHT
+                                        pred_taken = bht_val[1]; // taken if >= 2
                                         if (pred_taken)
                                             pred_target = insn_pc + se_L;
                                     end
-                                end else begin
-                                    // Register-indirect branch (BRNZ, BRGT, BR, BRR, CALL, RETURN)
-                                    // Use BHT for taken/not-taken, BTB for target
-                                    if (bht_bits[insn_pc[9:2]] && btb_valid[btb_idx]) begin
+                                end else if (is_uncond) begin
+                                    // Unconditional branch: ALWAYS taken.
+                                    // Redirect only if BTB has target.
+                                    if (btb_valid[btb_idx]) begin
                                         pred_taken  = 1'b1;
                                         pred_target = btb_target[btb_idx];
                                     end
-                                    // else: predict not-taken (no BTB entry = can't redirect)
+                                    // else: no BTB entry, can't know target → fall through
+                                    // (will mispredict, but target gets populated in BTB)
+                                end else begin
+                                    // Conditional register-indirect (BRNZ, BRGT)
+                                    // Use 2-bit BHT for taken/not-taken, BTB for target
+                                    if (bht_val[1] && btb_valid[btb_idx]) begin
+                                        pred_taken  = 1'b1;
+                                        pred_target = btb_target[btb_idx];
+                                    end
                                 end
                             end
 

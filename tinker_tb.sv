@@ -4,7 +4,7 @@ module tinker_tb;
     reg clk, reset;
     wire hlt;
 
-    tinker dut(.clk(clk), .reset(reset), .hlt(hlt));
+    tinker_core dut(.clk(clk), .reset(reset), .hlt(hlt));
 
     always #5 clk = ~clk;
 

@@ -2,6 +2,10 @@
 // Supports CDB snooping (2 buses), oldest-first issue (by ROB-head distance),
 // grant-based issue acknowledgement, and flush of younger entries.
 //
+// CDB bypass: the combinational issue logic checks CDB tags in addition to
+// registered ready bits, allowing same-cycle wakeup+issue. This removes the
+// 1-cycle CDB-to-issue delay from every dependent chain.
+//
 // entry_valid, entry_src1_rdy, entry_src2_rdy, entry_br_pred are packed
 // vectors so that always @(*) correctly re-triggers (iverilog workaround).
 
@@ -128,6 +132,48 @@ module reservation_station #(
     assign full        = !has_free0;
     assign almost_full = has_free0 && !has_free1;
 
+    // --- CDB bypass: compute effective readiness + value per entry ---
+    // These are combinational signals used by the issue selector below.
+    reg [NUM_ENTRIES-1:0] eff_src1_rdy;
+    reg [NUM_ENTRIES-1:0] eff_src2_rdy;
+    reg [63:0] eff_src1_val [0:NUM_ENTRIES-1];
+    reg [63:0] eff_src2_val [0:NUM_ENTRIES-1];
+
+    integer bi;
+    always @(*) begin
+        for (bi = 0; bi < NUM_ENTRIES; bi = bi + 1) begin
+            // src1 bypass
+            if (entry_src1_rdy[bi]) begin
+                eff_src1_rdy[bi] = 1'b1;
+                eff_src1_val[bi] = entry_src1_val[bi];
+            end else if (cdb_valid0 && entry_valid[bi] && entry_src1_tag[bi] == cdb_tag0) begin
+                eff_src1_rdy[bi] = 1'b1;
+                eff_src1_val[bi] = cdb_value0;
+            end else if (cdb_valid1 && entry_valid[bi] && entry_src1_tag[bi] == cdb_tag1) begin
+                eff_src1_rdy[bi] = 1'b1;
+                eff_src1_val[bi] = cdb_value1;
+            end else begin
+                eff_src1_rdy[bi] = 1'b0;
+                eff_src1_val[bi] = entry_src1_val[bi];
+            end
+
+            // src2 bypass
+            if (entry_src2_rdy[bi]) begin
+                eff_src2_rdy[bi] = 1'b1;
+                eff_src2_val[bi] = entry_src2_val[bi];
+            end else if (cdb_valid0 && entry_valid[bi] && entry_src2_tag[bi] == cdb_tag0) begin
+                eff_src2_rdy[bi] = 1'b1;
+                eff_src2_val[bi] = cdb_value0;
+            end else if (cdb_valid1 && entry_valid[bi] && entry_src2_tag[bi] == cdb_tag1) begin
+                eff_src2_rdy[bi] = 1'b1;
+                eff_src2_val[bi] = cdb_value1;
+            end else begin
+                eff_src2_rdy[bi] = 1'b0;
+                eff_src2_val[bi] = entry_src2_val[bi];
+            end
+        end
+    end
+
     // --- Oldest-ready selector (dual: find two oldest ready entries) ---
     integer ii;
     reg       found0, found1;
@@ -148,9 +194,9 @@ module reservation_station #(
         issue_rob_idx1 = 0; issue_imm1 = 0; issue_pc1 = 0; issue_br_pred1 = 0;
         issue_pred_target1 = 0;
 
-        // Pass 1: find oldest ready
+        // Pass 1: find oldest ready (using CDB-bypassed readiness)
         for (ii = 0; ii < NUM_ENTRIES; ii = ii + 1) begin
-            if (entry_valid[ii] && entry_src1_rdy[ii] && entry_src2_rdy[ii]) begin
+            if (entry_valid[ii] && eff_src1_rdy[ii] && eff_src2_rdy[ii]) begin
                 if ((entry_rob_idx[ii] - rob_head_idx) < best0 || !found0) begin
                     found0 = 1;
                     best0  = entry_rob_idx[ii] - rob_head_idx;
@@ -161,7 +207,7 @@ module reservation_station #(
 
         // Pass 2: find second oldest ready (skip sel0)
         for (ii = 0; ii < NUM_ENTRIES; ii = ii + 1) begin
-            if (entry_valid[ii] && entry_src1_rdy[ii] && entry_src2_rdy[ii] &&
+            if (entry_valid[ii] && eff_src1_rdy[ii] && eff_src2_rdy[ii] &&
                 (ii[3:0] != sel0 || !found0)) begin
                 if ((entry_rob_idx[ii] - rob_head_idx) < best1 || !found1) begin
                     if (ii[3:0] != sel0) begin
@@ -173,11 +219,12 @@ module reservation_station #(
             end
         end
 
+        // Output selected entries with bypassed values
         if (found0) begin
             issue_valid0      = 1;
             issue_opcode0     = entry_opcode[sel0];
-            issue_src1_value0 = entry_src1_val[sel0];
-            issue_src2_value0 = entry_src2_val[sel0];
+            issue_src1_value0 = eff_src1_val[sel0];
+            issue_src2_value0 = eff_src2_val[sel0];
             issue_dest_tag0   = entry_dest_tag[sel0];
             issue_rob_idx0    = entry_rob_idx[sel0];
             issue_imm0        = entry_imm[sel0];
@@ -188,8 +235,8 @@ module reservation_station #(
         if (found1) begin
             issue_valid1      = 1;
             issue_opcode1     = entry_opcode[sel1];
-            issue_src1_value1 = entry_src1_val[sel1];
-            issue_src2_value1 = entry_src2_val[sel1];
+            issue_src1_value1 = eff_src1_val[sel1];
+            issue_src2_value1 = eff_src2_val[sel1];
             issue_dest_tag1   = entry_dest_tag[sel1];
             issue_rob_idx1    = entry_rob_idx[sel1];
             issue_imm1        = entry_imm[sel1];
@@ -302,7 +349,7 @@ module reservation_station #(
                 end
             end
 
-            // ---- CDB snoop ----
+            // ---- CDB snoop (update registered ready bits for next cycle) ----
             for (si = 0; si < NUM_ENTRIES; si = si + 1) begin
                 if (entry_valid[si]) begin
                     if (cdb_valid0 && !entry_src1_rdy[si] && entry_src1_tag[si] == cdb_tag0) begin
