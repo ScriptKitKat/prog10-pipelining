@@ -368,6 +368,8 @@ module decode_rename (
             endcase
         end
 
+        issue_a = in0_valid && !stall_a;
+
         if (in1_valid && !stall_a) begin
             if (rob_full)
                 stall_b = 1'b1;
@@ -402,7 +404,6 @@ module decode_rename (
             end
         end
 
-        issue_a = in0_valid && !stall_a;
         issue_b = in1_valid && !stall_a && !stall_b;
 
         stall = stall_a;
