@@ -1,7 +1,7 @@
 `ifndef FPU_SV_INCLUDED
 `define FPU_SV_INCLUDED
 
-module fpu_class(input [63:0] f, output nan, output infinity, output zero, output subnormal, output normal);
+module fpu(input [63:0] f, output nan, output infinity, output zero, output subnormal, output normal);
     wire expOnes = &f[62:52];
     wire expZero = ~|f[62:52];
     wire fracZero = ~|f[51:0];
@@ -17,8 +17,8 @@ module fpu_mul(input [63:0] a, input [63:0] b, output reg [63:0] result);
     wire aNan, aInf, aZero, aSubnormal, aNormal;
     wire bNan, bInf, bZero, bSubnormal, bNormal;
 
-    fpu_class classA(.f(a), .nan(aNan), .infinity(aInf), .zero(aZero), .subnormal(aSubnormal), .normal(aNormal));
-    fpu_class classB(.f(b), .nan(bNan), .infinity(bInf), .zero(bZero), .subnormal(bSubnormal), .normal(bNormal));
+    fpu classA(.f(a), .nan(aNan), .infinity(aInf), .zero(aZero), .subnormal(aSubnormal), .normal(aNormal));
+    fpu classB(.f(b), .nan(bNan), .infinity(bInf), .zero(bZero), .subnormal(bSubnormal), .normal(bNormal));
 
     function [5:0] count_leading_zeros(input [52:0] sig);
         integer i;
@@ -132,8 +132,8 @@ module fpu_add(input [63:0] a, input [63:0] b, output reg [63:0] result);
     wire aNan, aInf, aZero, aSubnormal, aNormal;
     wire bNan, bInf, bZero, bSubnormal, bNormal;
 
-    fpu_class classA(.f(a), .nan(aNan), .infinity(aInf), .zero(aZero), .subnormal(aSubnormal), .normal(aNormal));
-    fpu_class classB(.f(b), .nan(bNan), .infinity(bInf), .zero(bZero), .subnormal(bSubnormal), .normal(bNormal));
+    fpu classA(.f(a), .nan(aNan), .infinity(aInf), .zero(aZero), .subnormal(aSubnormal), .normal(aNormal));
+    fpu classB(.f(b), .nan(bNan), .infinity(bInf), .zero(bZero), .subnormal(bSubnormal), .normal(bNormal));
 
     function [5:0] count_leading_zeros(input [55:0] sig);
         integer i;
@@ -319,8 +319,8 @@ module fpu_div(input [63:0] a, input [63:0] b, output reg [63:0] result);
     wire aNan, aInf, aZero, aSubnormal, aNormal;
     wire bNan, bInf, bZero, bSubnormal, bNormal;
 
-    fpu_class classA(.f(a), .nan(aNan), .infinity(aInf), .zero(aZero), .subnormal(aSubnormal), .normal(aNormal));
-    fpu_class classB(.f(b), .nan(bNan), .infinity(bInf), .zero(bZero), .subnormal(bSubnormal), .normal(bNormal));
+    fpu classA(.f(a), .nan(aNan), .infinity(aInf), .zero(aZero), .subnormal(aSubnormal), .normal(aNormal));
+    fpu classB(.f(b), .nan(bNan), .infinity(bInf), .zero(bZero), .subnormal(bSubnormal), .normal(bNormal));
 
     function [5:0] count_leading_zeros(input [52:0] sig);
         integer i;
